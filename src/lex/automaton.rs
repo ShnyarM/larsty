@@ -1,0 +1,316 @@
+use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}};
+
+pub const EPSILON_CHAR: u8 = 0;
+const ALPHABET_SIZE: usize = 256;
+const INVALID_SYMBOL: usize = usize::MAX;
+pub const NOT_ACCEPT:i32 = -1;
+
+#[derive(Debug)]
+pub struct DFA{
+    state_count: usize,
+    transitions: Vec<[usize; ALPHABET_SIZE]>,
+    // Stores the information of which states are accept states and the associated action. If
+    // NOT_ACCEPT,then not an accept state, otherwise it is the action
+    actions: Vec<i32>
+}
+
+#[derive(Debug)]
+pub struct NFA{
+    state_count: usize,
+    transitions: Vec<HashMap<u8, Vec<usize>>>,
+    // Stores the information of which states are accept states and the associated action. If
+    // NOT_ACCEPT,then not an accept state, otherwise it is the action
+    actions: Vec<i32>
+}
+
+impl DFA{
+    /// Get a DFA with a single start state
+    pub fn new() -> DFA {
+        let mut dfa = DFA { 
+            state_count: 1, 
+            transitions: Vec::new(),
+            actions: Vec::new()
+        };
+
+        dfa.adjust_vec();
+        dfa
+    }
+
+    // Makes sure that the vector of transitions matches the length of all states
+    fn adjust_vec(&mut self) {
+        if self.transitions.len() < self.state_count {
+            self.transitions.resize(self.state_count, [INVALID_SYMBOL; ALPHABET_SIZE]);
+            self.actions.resize(self.state_count, NOT_ACCEPT);
+        }
+    }
+
+    pub fn add_transition(&mut self, from:usize, to:usize, symbol:u8) {
+        self.transitions[from][symbol as usize] = to;
+    }
+
+    // Add this incase later start state is defined by something else
+    pub fn get_start_state(&self) -> usize {
+        0
+    }
+
+    pub fn get_state_count(&self) -> usize {
+        self.state_count
+    }
+
+    /// Set an action for a state. Can make a state an accept state
+    pub fn set_action(&mut self, s:usize, action:i32) {
+        if s >= self.state_count {
+            panic!("Error in DFA: Tried to access state that doesn't exist in DFA");
+        }
+        self.actions[s] = action;
+    }
+
+    /// Returns the newly created state
+    pub fn add_state(&mut self, action:i32) -> usize {
+        let state = self.state_count;
+        self.state_count += 1;
+
+        self.transitions.push([INVALID_SYMBOL; ALPHABET_SIZE]);
+        self.actions.push(action);
+
+        state
+    }
+
+    pub fn execute(&self, text: &str) -> bool {
+        let mut s = self.get_start_state();
+
+        for symb in text.bytes() {
+            s = self.transitions[s][symb as usize];
+            
+            if s == INVALID_SYMBOL {
+                return false;
+            } 
+        }
+
+        self.actions[s] != NOT_ACCEPT 
+    }
+}
+
+impl NFA{
+    /// Get a NFA with a single state that is both start and accept
+    pub fn new() -> NFA {
+        let mut n = NFA { 
+            state_count: 1, 
+            transitions: Vec::new(),
+            actions: Vec::new() 
+        };
+        n.adjust_vec();
+        n
+    }
+    
+    // Makes sure that the vector of transitions matches the length of all states
+    fn adjust_vec(&mut self) {
+        if self.transitions.len() < self.state_count {
+            self.transitions.resize(self.state_count, HashMap::new());
+            self.actions.resize(self.state_count, NOT_ACCEPT);
+        }
+    }
+
+    /// Get the HashMap of all transitions for a state
+    fn get_all_transitions(&self, state:usize) -> &HashMap<u8, Vec<usize>> {
+        if state >= self.get_state_count() {
+            panic!("Error in NFA: Tried to access state that doesn't exist in NFA");
+        } 
+
+        &self.transitions[state]
+    }
+
+    /// Get mutable list of transitions for a state and a symbol
+    fn get_transitions_mut(&mut self, from:usize, symbol:u8) -> &mut Vec<usize> {
+        if from >= self.get_state_count() {
+            panic!("Error in NFA: Tried to access state that doesn't exist in NFA");
+        } 
+
+        // Creates entry if it doesn't exist
+        self.transitions[from].entry(symbol).or_insert_with(|| Vec::new()) 
+    }
+
+    /// Get list of transitions for a state and a symbol
+    /// Returns None if no transitions exist for that state and symbol
+    fn get_transitions(&self, from:usize, symbol:u8) -> Option<&Vec<usize>> {
+        if from >= self.get_state_count() {
+            panic!("Error in NFA: Tried to access state that doesn't exist in NFA");
+        } 
+
+        self.transitions[from].get(&symbol) 
+    }
+
+    pub fn add_transition(&mut self, from:usize, to:usize, symbol:u8) {
+        let set = self.get_transitions_mut(from, symbol);
+        set.push(to);
+    }
+
+    /// Returns a list of all accepting states
+    pub fn get_accept_states(&self) -> Vec<usize> {
+        let mut result = vec![];
+        for (s, a) in self.actions.iter().enumerate() {
+            if *a != NOT_ACCEPT {
+                result.push(s);
+            }
+        }
+
+        result
+    }
+
+    // Add this incase later start state is defined by something else
+    pub fn get_start_state(&self) -> usize {
+        0
+    }
+
+    pub fn get_state_count(&self) -> usize {
+        self.state_count
+    }
+
+    /// Set action for a state. Can be used to make set accepting
+    pub fn set_action(&mut self, s:usize, action:i32) {
+        self.actions[s] = action;
+    }
+
+    pub fn set_state_count(&mut self, new_count:usize) {
+        self.state_count = new_count;
+        self.adjust_vec();
+    }
+
+    /// Merges two NFAs by adding all states of other to this NFA
+    /// 
+    /// New accept state depends on accept argument. If 0, the accept state of self is taken. If 1,
+    /// the accept state of other is taken
+    ///
+    /// new_transitions is a list of transitions to be added during this merge, allowing for
+    /// connections between self and other to be made.
+    /// Each entry in new_transitions is of the format:
+    ///
+    /// ((nfa, state1), (nfa, state2), symbol)
+    /// nfa defines which NFA we're referring to. 0 indicates self, 1 indicates other.
+    /// Then a transition from state1 to state2 is made with symbol being the character.
+    ///
+    /// Ex.: ((0, 5), (1, 6), 'c') Creates a transition from self's state 5 to others state 6 for
+    /// the symbol 'c'.
+    pub fn merge(&mut self, other:&NFA, new_transitions:&Vec<((i32, usize), (i32, usize), u8)>) -> &mut NFA{
+        let orig_count = self.get_state_count();
+        self.set_state_count(orig_count+other.get_state_count());
+
+        // Copy transitions
+        for (state1, hashmap) in other.transitions.iter().enumerate() {
+            for (symb, state_list) in hashmap.iter() {
+                for state2 in state_list {
+                    self.add_transition(state1+orig_count, state2+orig_count, symb.clone());   
+                } 
+            } 
+        }
+
+        // Copy accept states
+        for (i, action) in other.actions.iter().enumerate() {
+            self.actions[i+orig_count] = *action;
+        }
+
+        // add connections
+        for ((nfa1, state1), (nfa2, state2), symbol) in new_transitions {
+            // If we take state from self, nfa1/2 will be 0
+            self.add_transition(
+                state1+orig_count*(*nfa1 as usize),
+                state2+orig_count*(*nfa2 as usize),
+                *symbol
+            );
+        }
+              
+        self
+    }
+
+    // For a set of states, compute all states that can be reached through epsilon moves
+    fn epsilon_closure(&self, states:&Vec<usize>) -> Vec<usize> {
+        // For each state we check which states we can reach through an epsilon transition.
+        // We do this until we reach a fixpoint
+        let mut seen_states: HashSet<usize> = HashSet::new();
+        let mut to_process = VecDeque::new();
+
+        for s in states {
+            seen_states.insert(*s);
+            to_process.push_back(*s);
+        }
+
+        // Compute until nothing in queue
+        while let Some(s) = to_process.pop_front() {
+            if let Some(reached_states) = self.get_transitions(s, EPSILON_CHAR){
+                for x in reached_states {
+                    if seen_states.insert(*x) {
+                        to_process.push_back(*x);
+                    }
+                }
+            }
+        }
+
+        let result: Vec<usize> = seen_states.into_iter().collect();
+        result
+    }
+
+    pub fn to_dfa(&self) -> DFA {
+        // Map each new state in DFA to a set of states
+        let mut new_states: Vec<Vec<usize>> = Vec::new();
+
+        // Keep track of all set of states we have inserted with their state in DFA
+        let mut seen_sets: HashMap<Vec<usize>, usize> = HashMap::new();
+        let mut dfa = DFA::new();
+
+        let start_closure = self.epsilon_closure(&vec![self.get_start_state()]);
+        seen_sets.insert(start_closure.clone(), dfa.get_start_state());
+        new_states.push(start_closure);
+
+        // Go through each new state and add new states based on transitions.
+        // New states are set of states from NFA. new_states keeps track of what state represents which
+        // set of states
+        let mut i = 0;
+        while i < new_states.len() {
+            let set = &new_states[i];
+            let mut highest_action = -1;
+
+            // We create a new HashMap and contains all possible transitions for this set of states
+            let mut transitions: HashMap<u8, Vec<usize>> = HashMap::new();
+            for s in set {
+                let t = self.get_all_transitions(*s);
+                for (symbol, list) in t.iter() {
+                    // Ignore epsilon transitions
+                    if *symbol == EPSILON_CHAR { continue; } 
+
+                    // We have already added this symbol to our new list
+                    if let Some(existing) = transitions.get_mut(symbol) {
+                        existing.extend(list.clone());
+                    }else{ // Create the entry for this list
+                        transitions.insert(*symbol, list.clone());
+                    }
+                }
+                
+                let state_action = self.actions[*s];
+                highest_action = max(highest_action, state_action);
+            }
+
+            // For each symbol in transition table we create new state
+            for (symbol, list) in transitions {
+                let closure = self.epsilon_closure(&list);
+
+                if let Some(existing_state) = seen_sets.get(&closure) {
+                    dfa.add_transition(i, *existing_state, symbol);
+                }else{
+                    // Action will be adjusted when processing
+                    let new_state = dfa.add_state(NOT_ACCEPT);
+                    dfa.add_transition(i, new_state, symbol);
+
+                    seen_sets.insert(closure.clone(), new_state);
+                    new_states.push(closure);
+                }
+            }
+
+            dfa.set_action(i, highest_action);
+
+            i+=1;
+        }
+
+        // TO DO: compute minimal equivalent DFA
+        dfa
+    }
+}
