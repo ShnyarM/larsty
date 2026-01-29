@@ -59,9 +59,6 @@ impl DFA{
 
     /// Set an action for a state. Can make a state an accept state
     pub fn set_action(&mut self, s:usize, action:i32) {
-        if s >= self.state_count {
-            panic!("Error in DFA: Tried to access state that doesn't exist in DFA");
-        }
         self.actions[s] = action;
     }
 
@@ -76,10 +73,11 @@ impl DFA{
         state
     }
 
-    pub fn execute(&self, text: &str) -> bool {
+    /// Performs standard execution of an input
+    pub fn execute(&self, input: &str) -> bool {
         let mut s = self.get_start_state();
 
-        for symb in text.bytes() {
+        for symb in input.bytes() {
             s = self.transitions[s][symb as usize];
             
             if s == INVALID_SYMBOL {
@@ -88,6 +86,65 @@ impl DFA{
         }
 
         self.actions[s] != NOT_ACCEPT 
+    }
+
+    /// Performs longest matching on the input. Returns the recognized tokens as a list of matched
+    /// actions.
+    /// Returns Err when there was a lexing error.
+    pub fn longest_matching<'a>(&self, input:&'a str) -> Result<Vec<(i32, &'a str)>, &str> {
+        let mut s = self.get_start_state();
+        let mut actions = Vec::new();
+
+        let bytes = input.as_bytes();
+        let mut i = 0;
+
+        let mut last_accept_action = -1;
+        let mut last_accept_byte = 0;
+        let mut last_consumed_byte = 0;
+
+        while i < bytes.len() {
+            let next_state = self.transitions[s][bytes[i] as usize];
+
+            if next_state != INVALID_SYMBOL {
+                s = next_state;
+                i += 1;
+
+                if self.actions[s] != NOT_ACCEPT {
+                    last_accept_byte = i;
+                    last_accept_action = self.actions[s];
+                }
+                continue;
+            }
+
+            // We can't continue. Check if we have been in accept state
+            if last_accept_action != -1 {
+                // Consume until this point
+                let detected = &input[last_consumed_byte as usize..last_accept_byte as usize];
+                actions.push((last_accept_action, detected));
+                last_consumed_byte = last_accept_byte;
+
+                // Return state
+                s = self.get_start_state();
+                i = last_accept_byte as usize;
+                last_accept_action = -1;
+                last_accept_byte = 0;
+                continue;
+            }
+
+            // We have lexing error
+            return Err("Lexing error");
+        }
+
+        // At end we check if we're at an accept state
+        if self.actions[s] == NOT_ACCEPT {
+            return Err("Lexing error");
+        }
+
+        // consume remaining
+        let detected = &input[last_consumed_byte as usize..last_accept_byte as usize];
+        actions.push((last_accept_action, detected));
+
+        Ok(actions)
     }
 }
 
@@ -113,19 +170,11 @@ impl NFA{
 
     /// Get the HashMap of all transitions for a state
     fn get_all_transitions(&self, state:usize) -> &HashMap<u8, Vec<usize>> {
-        if state >= self.get_state_count() {
-            panic!("Error in NFA: Tried to access state that doesn't exist in NFA");
-        } 
-
         &self.transitions[state]
     }
 
     /// Get mutable list of transitions for a state and a symbol
     fn get_transitions_mut(&mut self, from:usize, symbol:u8) -> &mut Vec<usize> {
-        if from >= self.get_state_count() {
-            panic!("Error in NFA: Tried to access state that doesn't exist in NFA");
-        } 
-
         // Creates entry if it doesn't exist
         self.transitions[from].entry(symbol).or_insert_with(|| Vec::new()) 
     }
@@ -133,10 +182,6 @@ impl NFA{
     /// Get list of transitions for a state and a symbol
     /// Returns None if no transitions exist for that state and symbol
     fn get_transitions(&self, from:usize, symbol:u8) -> Option<&Vec<usize>> {
-        if from >= self.get_state_count() {
-            panic!("Error in NFA: Tried to access state that doesn't exist in NFA");
-        } 
-
         self.transitions[from].get(&symbol) 
     }
 
@@ -222,7 +267,8 @@ impl NFA{
         self
     }
 
-    // For a set of states, compute all states that can be reached through epsilon moves
+    /// For a set of states, compute all states that can be reached through epsilon moves
+    /// Returns the list sorted
     fn epsilon_closure(&self, states:&Vec<usize>) -> Vec<usize> {
         // For each state we check which states we can reach through an epsilon transition.
         // We do this until we reach a fixpoint
@@ -245,7 +291,8 @@ impl NFA{
             }
         }
 
-        let result: Vec<usize> = seen_states.into_iter().collect();
+        let mut result: Vec<usize> = seen_states.into_iter().collect();
+        result.sort();
         result
     }
 

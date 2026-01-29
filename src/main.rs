@@ -1,11 +1,31 @@
+use std::vec;
+
 //use rust_parser::types::Expression;
-use rust_parser::lex::Regexp;
+use rust_parser::lex::{Lexer, Regexp};
+
+#[derive(Debug)]
+enum Token {
+    If,
+    Function,
+    Id(String)
+}
 
 fn main() {
-    let dfa = Regexp::new_rep(
-        Regexp::new_string("repetition")
-    ).to_dfa();
+    use Token::*;
 
-    let result = dfa.execute("Helluo");
-    println!("Value: {}", result);
+    let rules: Vec<(Regexp, Box<dyn Fn(&str) -> Token>)> = vec![
+        (Regexp::string("if"), Box::new(|_| If)),
+        (Regexp::string("if"), Box::new(|_| Function)),
+        (Regexp::string("function"), Box::new(|_| Function)),
+        (Regexp::string("identifier"), Box::new(|s| {
+            let str = String::from(s).trim().to_string();
+            Id(str)
+        }))
+    ];
+
+    let lexer = Lexer::generate(rules);
+
+    let list = lexer.lex("if if function if identifier function");
+    
+    println!("{:?}", &list);
 }

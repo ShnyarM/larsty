@@ -4,6 +4,55 @@ use automaton::{NFA, DFA, EPSILON_CHAR, NOT_ACCEPT};
 
 pub use regexp::Regexp;
 
+pub struct Lexer<T> {
+    dfa: DFA,
+    token_generators: Vec<Box<dyn Fn(&str) -> T>>
+}
+
+impl<T> Lexer<T>{
+    pub fn generate(rules: Vec<(Regexp, Box<dyn Fn(&str) -> T>)>) -> Lexer<T> {
+        let n = rules.len();
+        if n < 1 {
+            return Lexer { dfa: Regexp::Empty.to_dfa(), token_generators: Vec::new() }
+        }
+
+        // Create big NFA which includes all rules
+        let mut nfa = NFA::new();
+        let mut generators = Vec::new();
+        let start = nfa.get_start_state();
+
+        // Add whitespace transition so rules can have whitespaces between them
+        nfa.add_transition(start, start, b' ');
+
+        for (i, (regexp, token)) in rules.into_iter().enumerate() {
+            // First rules should have highest action number
+            // Lowest priority will have action_level==0
+            let action_level = n-i-1;
+            let new_nfa = regexp.to_nfa(action_level as i32);
+
+            let merge_list = vec![
+                ((0, start), (1, new_nfa.get_start_state()), EPSILON_CHAR)
+            ];
+            nfa.merge(&new_nfa, &merge_list);
+
+            generators.push(token);
+        }
+
+        // Reverse actions, since first rule has highest index
+        generators.reverse();
+        Lexer { dfa: nfa.to_dfa(), token_generators: generators }
+    }
+
+    pub fn lex(&self, input:&str) -> Result<Vec<T>, &str> {
+        let actions = self.dfa.longest_matching(input)?;
+
+        println!("{:?}", actions);
+
+        let result = actions.iter().map(|(action, str)| self.token_generators[*action as usize](str)).collect();
+        Ok(result)
+    }
+}
+
 impl Regexp {
     pub fn to_dfa(&self) -> DFA {
         self.to_nfa(0).to_dfa()
@@ -97,7 +146,7 @@ mod test{
 
     #[test]
     fn lex_hello_world() {
-        let regexp = Regexp::new_string("Hello World!"); 
+        let regexp = Regexp::string("Hello World!"); 
         let dfa = regexp.to_dfa();
 
         assert!(dfa.execute("Hello World!"));
@@ -108,17 +157,21 @@ mod test{
 
     #[test]
     fn lex_empty() {
-        let dfa = Regexp::new_string("").to_dfa();
+        let dfa = Regexp::string("").to_dfa();
 
+        assert!(dfa.execute(""));
+        assert!(!dfa.execute("Hello"));
+
+        let dfa = Regexp::empty().to_dfa();
         assert!(dfa.execute(""));
         assert!(!dfa.execute("Hello"));
     }
 
     #[test]
     fn lex_or() {
-        let dfa = Regexp::new_or(
-            Regexp::new_string("This is one."),
-            Regexp::new_string("Another one..")
+        let dfa = Regexp::or(
+            Regexp::string("This is one."),
+            Regexp::string("Another one..")
         ).to_dfa();
 
         assert!(dfa.execute("This is one."));
@@ -130,9 +183,9 @@ mod test{
 
     #[test]
     fn lex_concat() {
-        let dfa = Regexp::new_concat(
-            Regexp::new_string("This is one."),
-            Regexp::new_string("Another one..")
+        let dfa = Regexp::concat(
+            Regexp::string("This is one."),
+            Regexp::string("Another one..")
         ).to_dfa();
 
         assert!(dfa.execute("This is one.Another one.."));
@@ -145,8 +198,8 @@ mod test{
 
     #[test]
     fn lex_rep() {
-        let dfa = Regexp::new_rep(
-            Regexp::new_string("repetition")
+        let dfa = Regexp::rep(
+            Regexp::string("repetition")
         ).to_dfa();
 
         assert!(dfa.execute(""));
@@ -162,17 +215,17 @@ mod test{
     #[test]
     fn lex_complex_expression() {
         // ((ab | cd) e*) f
-        let regex = Regexp::new_concat(
-            Regexp::new_concat(
-                Regexp::new_or(
-                    Regexp::new_string("ab"),
-                    Regexp::new_string("cd"),
+        let regex = Regexp::concat(
+            Regexp::concat(
+                Regexp::or(
+                    Regexp::string("ab"),
+                    Regexp::string("cd"),
                 ),
-                Regexp::new_rep(
-                    Regexp::new_string("e"),
+                Regexp::rep(
+                    Regexp::string("e"),
                 ),
             ),
-            Regexp::new_string("f"),
+            Regexp::string("f"),
         );
 
         let dfa = regex.to_dfa();
