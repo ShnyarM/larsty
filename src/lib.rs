@@ -1,2 +1,2 @@
 pub mod types;
-pub mod lex;
+pub mod frontend;

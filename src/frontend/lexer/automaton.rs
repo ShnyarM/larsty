@@ -1,4 +1,5 @@
 use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}};
+use serde::{Serialize, Deserialize};
 
 pub const EPSILON_CHAR: u8 = 0;
 const ALPHABET_SIZE: usize = 256;
@@ -14,6 +15,15 @@ pub struct DFA{
     actions: Vec<i32>
 }
 
+/// A compressed representation of DFA. Is meant to be used for storing the DFA, not for actual
+/// execution
+#[derive(Serialize, Deserialize)]
+pub struct CompressedDFA{
+    state_count: usize,
+    transitions: Vec<HashMap<u8, usize>>,
+    actions: HashMap<usize, i32>
+}
+
 #[derive(Debug)]
 pub struct NFA{
     state_count: usize,
@@ -23,17 +33,54 @@ pub struct NFA{
     actions: Vec<i32>
 }
 
-impl DFA{
-    /// Get a DFA with a single start state
-    pub fn new() -> DFA {
-        let mut dfa = DFA { 
-            state_count: 1, 
-            transitions: Vec::new(),
-            actions: Vec::new()
-        };
+impl
 
         dfa.adjust_vec();
         dfa
+    }
+
+    pub fn compress(self) -> CompressedDFA {
+        // Copy transitions
+        let mut transitions = Vec::new();
+        for t in self.transitions.iter() {
+            let mut map = HashMap::new();
+            for (symbol, s2) in t.iter().enumerate() {
+                if *s2 != INVALID_SYMBOL {
+                   map.insert(symbol as u8, *s2); 
+                }
+            } 
+            transitions.push(map);
+        }
+
+        // Copy actions
+        let mut actions = HashMap::new();
+        for (s, a) in self.actions.iter().enumerate() {
+            if *a != NOT_ACCEPT {
+                actions.insert(s, *a);
+            }
+        }
+
+        CompressedDFA { state_count: self.state_count, transitions, actions }
+    }
+    
+    pub fn from_compressed(compressed: CompressedDFA) -> DFA {
+        // Copy transitions
+        let mut transitions = Vec::new();
+        for (i, t) in compressed.transitions.iter().enumerate() {
+            transitions.push([INVALID_SYMBOL; ALPHABET_SIZE]);
+            for (symbol, s2) in t.iter() {
+                transitions[i][*symbol as usize] = *s2;
+            } 
+        }
+
+        // Copy actions
+        let mut actions = Vec::new();
+        actions.resize(compressed.state_count, NOT_ACCEPT);
+        for (s, a) in compressed.actions.iter() {
+            actions[*s] = *a;
+        }
+
+        DFA { state_count: compressed.state_count, transitions, actions }
     }
 
     // Makes sure that the vector of transitions matches the length of all states
