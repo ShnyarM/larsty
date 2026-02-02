@@ -1,59 +1,19 @@
+mod rules;
+mod automaton;
 mod lexer;
+mod regexp;
 
-use lexer::Regexp;
-use lexer::Lexer;
-
-#[derive(Clone)]
-enum Token {
-    Function,
-    Let,
-    Id(String),
-    Eq,
-    EqEq,
-}
-
-type TokenGen = dyn Fn(&str) -> Token;
-
-fn rule<F>(r: Regexp, f: F) -> (Regexp, Box<TokenGen>) 
-where 
-    F: Fn(&str) -> Token + 'static
-{
-    (r, Box::new(f))
-}
-
-fn keyword(s: &str, t: Token) -> (Regexp, Box<TokenGen>) {
-    (Regexp::string(s), Box::new(move |_| t.clone()))
-}
-
-fn lexing_rules() -> Vec<(Regexp, Box<TokenGen>)> {
-    use Token::*;
-    
-    let id_chars = Regexp::or(
-        Regexp::string("_"), 
-        Regexp::or(
-            Regexp::letter(), 
-            Regexp::digit()
-        )
-    );
-
-    let identifier = Regexp::concat(Regexp::letter(), Regexp::rep(id_chars));
-
-    vec![
-        keyword("function", Function),
-        keyword("let",      Let),
-        keyword("==",       EqEq),
-        keyword("=",        Eq),
-        rule(identifier,    |s| Id(String::from(s.trim())))
-    ]
-}
+pub use regexp::Regexp;
+pub use lexer::Lexer;
+pub use rules::get_rules;
 
 pub fn pre_compile_lexer() {
-    Lexer::pre_compile(lexing_rules());
+    Lexer::pre_compile(rules::get_rules());
 }
 
 #[cfg(test)]
 mod test{
-    use super::*;
+    use super::regexp::Regexp;
 
     #[test]
     fn lex_hello_world() {

@@ -1,10 +1,9 @@
-mod automaton;
-mod regexp;
-use automaton::{NFA, DFA, EPSILON_CHAR};
+use super::automaton::{NFA, DFA, CompressedDFA, EPSILON_CHAR};
 use std::{fs::File, io::Write, env, path::PathBuf};
 
-pub use regexp::Regexp;
+pub use super::regexp::Regexp;
 
+/// Models a complete lexer. Includes the dfa and the actions for each rule.
 pub struct Lexer<T> {
     dfa: DFA,
     token_generators: Vec<Box<dyn Fn(&str) -> T>>
@@ -25,7 +24,8 @@ impl<T> Lexer<T>{
         let json = serde_json::to_string(&compressed_dfa).unwrap();
         write!(file, "{}", json).unwrap();
     }
-
+    
+    /// Generates the lexer for a set of given rules
     pub fn generate(rules: Vec<(Regexp, Box<dyn Fn(&str) -> T>)>) -> Lexer<T> {
         let n = rules.len();
         if n < 1 {
@@ -58,11 +58,28 @@ impl<T> Lexer<T>{
         generators.reverse();
         Lexer { dfa: nfa.to_dfa(), token_generators: generators }
     }
+    
+    /// Given a json representation of a compressed DFA and the set of rules, constructs the Lexer
+    pub fn from_saved(
+        str: &str, 
+        rules: Vec<(Regexp, Box<dyn Fn(&str) -> T>)>)
+    -> Lexer<T> {
+        // DFA is already consructed, so just read it and add generators to vec
+        let compressed_dfa: CompressedDFA = serde_json::from_str(str).unwrap(); 
+        let dfa = DFA::from_compressed(compressed_dfa);
+        
+        let mut generators = Vec::new();
+        for (_, token) in rules {
+            generators.push(token);
+        };
+        
+        // Reverse actions, since first rule has highest index
+        generators.reverse();
+        return Lexer { dfa, token_generators: generators }
+    }
 
     pub fn lex(&self, input:&str) -> Result<Vec<T>, &str> {
         let actions = self.dfa.longest_matching(input)?;
-
-        println!("{:?}", actions);
 
         let result = actions.iter().map(|(action, str)| self.token_generators[*action as usize](str)).collect();
         Ok(result)

@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}};
+use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}, hash::Hash};
 use serde::{Serialize, Deserialize};
 
 pub const EPSILON_CHAR: u8 = 0;
@@ -33,13 +33,18 @@ pub struct NFA{
     actions: Vec<i32>
 }
 
-impl
-
+impl DFA{
+    pub fn new() -> DFA {
+        let mut dfa = DFA {
+            state_count: 1,
+            transitions: Vec::new(),
+            actions: Vec::new()
+        };
         dfa.adjust_vec();
         dfa
     }
 
-    pub fn compress(self) -> CompressedDFA {
+    pub fn compress(&self) -> CompressedDFA {
         // Copy transitions
         let mut transitions = Vec::new();
         for t in self.transitions.iter() {
@@ -109,6 +114,19 @@ impl
         self.actions[s] = action;
     }
 
+    /// Returns the amount of different actions present in this DFA
+    fn action_count(&self) -> i32 {
+        let mut count = 0;
+        let mut seen = HashSet::new();
+
+        for a in self.actions.iter() {
+            if seen.insert(a) {
+                count += 1;
+            }
+        }
+        count
+    }
+
     /// Returns the newly created state
     pub fn add_state(&mut self, action:i32) -> usize {
         let state = self.state_count;
@@ -118,6 +136,105 @@ impl
         self.actions.push(action);
 
         state
+    }
+    
+    fn set_state_count(&mut self, count: usize) {
+        self.state_count = count;
+        self.adjust_vec();
+    }
+
+    /// Changes the DFA to be the minimal equivalent DFA
+    /// https://www.geeksforgeeks.org/theory-of-computation/minimization-of-dfa/
+    fn minimize(&mut self) {
+        let mut partitions: Vec<Vec<usize>> = Vec::new();
+        let mut state_to_partition: Vec<usize> = Vec::new();
+        partitions.resize(self.action_count() as usize, Vec::new());
+        state_to_partition.resize(self.get_state_count(), 0);
+        
+        // Create initial partition based on action of state
+        for (i, a) in self.actions.iter().enumerate() {
+            partitions[(*a+1) as usize].push(i);
+            state_to_partition[i] = *a as usize;
+        }
+
+        // Use transitions of compressed DFA, more effective here
+        let transitions = self.compress().transitions;
+
+        // Refine partitions until fixpoint reached
+        let mut change_occured = true;
+        while change_occured {
+            change_occured = false;
+            let mut new_partitions: Vec<Vec<usize>> = Vec::new();
+
+            // Go through all partitions
+            for p in partitions.into_iter() {
+                // For a given set of transitions, store all states that have exactly the same
+                // transitions
+                let mut signatures: HashMap<Vec<(u8, usize)>, Vec<usize>> = HashMap::new();
+
+                for s in p.iter() {
+                    // Create a sorted list of all transitions to then insert into hashmap
+                    let mut transition_set: Vec<(u8, usize)> = transitions[*s]
+                        .iter()
+                        .map(|(k,v)| (*k,*v))
+                        .collect();
+                    transition_set.sort();
+
+                    let signature_list = signatures.entry(transition_set).or_insert(Vec::new());
+                    signature_list.push(*s);
+                }
+
+                // Check if different set of transitions exist
+                if signatures.len() > 1 {
+                    change_occured = true;
+
+                    // For each group create a new partition
+                    for (_, states) in signatures.into_iter() {
+                        let index = new_partitions.len();
+                        for s in states.iter() {
+                            state_to_partition[*s] = index;
+                        } 
+                        new_partitions.push(states);
+                    }
+                } else {
+                    let index = new_partitions.len();
+                    for s in p.iter() {
+                        state_to_partition[*s] = index;
+                    }
+                    new_partitions.push(p);
+                }
+            }  
+            partitions = new_partitions;
+        }
+
+        // Construct new DFA
+        // Each partition corresponds to a new state in minimized DFA
+        let mut new_dfa = DFA::new();
+        new_dfa.set_state_count(partitions.len()); 
+
+        // reorder partition so that partition that contains start is at beginning
+        if let Some(pos) = partitions.iter().position(|v| v.contains(&0)) {
+            if pos != 0 {
+                // update state to partition mapping
+                for s in partitions[0].iter() {
+                    state_to_partition[*s] = pos;
+                }
+                for s in partitions[pos].iter() {
+                    state_to_partition[*s] = 0;
+                }
+                partitions.swap(0, pos);
+            }
+        }
+
+        for (i, p) in partitions.into_iter().enumerate() {
+            // Only 1 state needs to be used, since they all have same transitions
+            new_dfa.actions[i] = self.actions[p[0]];
+            for (symbol, s) in transitions[p[0]].iter() {
+                new_dfa.transitions[i][*symbol as usize] = state_to_partition[*s] as usize;
+            }
+        }
+
+        *self = new_dfa;
     }
 
     /// Performs standard execution of an input
@@ -403,8 +520,10 @@ impl NFA{
 
             i+=1;
         }
-
-        // TO DO: compute minimal equivalent DFA
+        
+        println!("State count before: {}", dfa.get_state_count());
+        dfa.minimize();
+        println!("State count after: {}", dfa.get_state_count());
         dfa
     }
 }
