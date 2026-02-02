@@ -521,9 +521,9 @@ impl NFA{
             i+=1;
         }
         
-        println!("State count before: {}", dfa.get_state_count());
+        println!("State count before minimizing DFA: {}", dfa.get_state_count());
         dfa.minimize();
-        println!("State count after: {}", dfa.get_state_count());
+        println!("State count after minimizing DFA: {}", dfa.get_state_count());
         dfa
     }
 }
