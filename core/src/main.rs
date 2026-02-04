@@ -1,7 +1,17 @@
-fn main() {
-    let lexer = core::lex::get_lexer();
+use std::env;
+use std::fs;
 
-    let tokens = lexer.lex("if function ifififif hellou").unwrap();
-    println!("{:?}", tokens);
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        panic!("Please provide a file to compile.");
+    }
+
+    let file_path = &args[1];
+    let program = fs::read_to_string(file_path)
+        .expect("Error reading the given file.");
+
+    core::compile(&program);
 }
 

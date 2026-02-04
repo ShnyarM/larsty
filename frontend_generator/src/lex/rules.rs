@@ -33,6 +33,6 @@ pub fn get_rules() -> Vec<(Regexp, Box<TokenGen>)> {
         keyword("let",      Let),
         keyword("==",       EqEq),
         keyword("=",        Eq),
-        rule(identifier,    |s| Id(String::from(s.trim())))
+        rule(identifier,    |s| Id(String::from(s.trim()))),
     ]
 }

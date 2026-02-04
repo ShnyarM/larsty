@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}, hash::Hash};
+use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}};
 use serde::{Serialize, Deserialize};
 
 pub const EPSILON_CHAR: u8 = 0;
@@ -116,15 +116,14 @@ impl DFA{
 
     /// Returns the amount of different actions present in this DFA
     fn action_count(&self) -> i32 {
-        let mut count = 0;
-        let mut seen = HashSet::new();
+        let mut highest_seen = -1;
 
         for a in self.actions.iter() {
-            if seen.insert(a) {
-                count += 1;
+            if *a > highest_seen {
+                highest_seen = *a;
             }
         }
-        count
+        highest_seen+2
     }
 
     /// Returns the newly created state
@@ -144,8 +143,18 @@ impl DFA{
     }
 
     /// Changes the DFA to be the minimal equivalent DFA
-    /// https://www.geeksforgeeks.org/theory-of-computation/minimization-of-dfa/
     fn minimize(&mut self) {
+        // Algorithm works by creating partitions of the states and iteratively refining them.
+        // A pair of states is indistuingishable if for every symbol they go to same partition of
+        // state.
+        // Essentially, a pair of states is indistinguishable if they in practice are the same
+        // state.
+        // We hold the invariant that two indistinguishable are always in the same partition.
+        // We start with the partition based on the actions of the states. We then iteratively
+        // refine the partitions by splitting sets of states if they have a different partition for
+        // a specific symbol.
+        // If no change  can be made anymore, were done. Each partition then represents a single
+        // state.
         let mut partitions: Vec<Vec<usize>> = Vec::new();
         let mut state_to_partition: Vec<usize> = Vec::new();
         partitions.resize(self.action_count() as usize, Vec::new());
@@ -174,9 +183,11 @@ impl DFA{
 
                 for s in p.iter() {
                     // Create a sorted list of all transitions to then insert into hashmap
+                    // We mutate transitions to point to partition it goes to check if
+                    // distinguishable 
                     let mut transition_set: Vec<(u8, usize)> = transitions[*s]
                         .iter()
-                        .map(|(k,v)| (*k,*v))
+                        .map(|(k,v)| (*k, state_to_partition[*v]))
                         .collect();
                     transition_set.sort();
 
@@ -209,6 +220,10 @@ impl DFA{
 
         // Construct new DFA
         // Each partition corresponds to a new state in minimized DFA
+        
+        // Remove empty partitions
+        partitions = partitions.into_iter().filter(|p| p.len() > 0).collect();
+
         let mut new_dfa = DFA::new();
         new_dfa.set_state_count(partitions.len()); 
 
@@ -267,6 +282,12 @@ impl DFA{
         let mut last_consumed_byte = 0;
 
         while i < bytes.len() {
+            let b = bytes[i];
+            if b == b'\n' {
+                i += 1;
+                continue;
+            }
+
             let next_state = self.transitions[s][bytes[i] as usize];
 
             if next_state != INVALID_SYMBOL {

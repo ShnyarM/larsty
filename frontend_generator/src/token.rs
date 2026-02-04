@@ -5,4 +5,5 @@ pub enum Token { Function,
     Eq,
     If,
     EqEq,
+    EOF
 }
