@@ -1,7 +1,7 @@
 use std::fmt;
 
-use crate::{Expression, Node, Statement, Token};
-use super::rules::NonTerminal;
+use crate::{Node, Token, Location};
+use super::rules::{AstNode, NonTerminal};
 
 /// Used to describe rules in the grammar
 #[derive(PartialEq, PartialOrd, Eq, Ord, Debug)]
@@ -16,15 +16,10 @@ pub enum Symbol {
 /// Will be the output of the ParserDFA
 pub enum ProcessedSymbol {
     T(Node<Token>),
-    N(Node<(NonTerminal, Vec<ProcessedSymbol>, usize)>)
+    N(Node<(NonTerminal, AstNode)>)
 }
 
-pub enum AstNode {
-    S(Statement),
-    E(Expression)
-}
-
-pub type RuleGenerator = Box<dyn Fn(Vec<ProcessedSymbol>, &Grammar) -> AstNode>;
+pub type RuleGenerator = Box<dyn Fn(Vec<ProcessedSymbol>) -> AstNode>;
 
 pub struct Rule {
     pub lhs: NonTerminal,
@@ -36,12 +31,18 @@ pub struct Rule {
 pub type Grammar = Vec<Rule>;
 
 impl ProcessedSymbol {
-    pub fn convert(self, grammar: &Grammar) -> Node<AstNode>{
+    pub fn get_loc(&self) -> &Location {
+        match self {
+            ProcessedSymbol::T(i) => i.loc(),
+            ProcessedSymbol::N(i) => i.loc()
+        }
+    }
+
+    pub fn convert(self) -> Node<AstNode>{
         match self {
             ProcessedSymbol::N(n) => {
-                let ((_, l, i), loc) = n.extract();
-                let ast = (grammar[i].generator)(l, grammar);
-                Node::new(ast, loc)
+                let ((_, i), loc) = n.extract();
+                Node::new(i, loc)
             }
             _ => panic!("Can't convert a terminal.")
         }

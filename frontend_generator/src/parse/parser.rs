@@ -2,6 +2,9 @@ use std::{fs::File, io::Write, env, path::PathBuf};
 
 use super::automaton::{ParserDFA, CompressedParserDFA};
 use super::types::{Grammar};
+use super::rules::{AstNode};
+use crate::ast::Node;
+use crate::Token;
 
 /// Represents a complete parser with the DFA and generators
 pub struct Parser {
@@ -42,5 +45,9 @@ impl Parser {
         let dfa = ParserDFA::from_compressed(compressed_dfa);
         
         return Parser { dfa, grammar }
+    }
+
+    pub fn parse(&self, input: Vec<Node<Token>>) -> Result<AstNode, &str> {
+        self.dfa.parse(input, &self.grammar)
     }
 }

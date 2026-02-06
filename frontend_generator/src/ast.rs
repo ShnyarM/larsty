@@ -1,9 +1,17 @@
+#[derive(Clone, Debug)]
 pub struct Location {
-    line: i32,
-    char: i32
+    line: usize,
+    char: usize
+}
+
+impl Location {
+    pub fn new(l: usize, c: usize) -> Location {
+        Location {line: l, char: c}
+    }
 }
 
 /// General struct that holds element as well as location information
+#[derive(Debug)]
 pub struct Node<T> {
     loc: Location,
     elem: T
@@ -36,12 +44,14 @@ impl<T> Node<T> {
     }
 }
 
+#[derive(Debug)]
 pub enum Expression {
     Add(Box<Node<Expression>>, Box<Node<Expression>>),
     Mul(Box<Node<Expression>>, Box<Node<Expression>>),
     Val(i32)
 }
 
+#[derive(Debug)]
 pub enum Statement {
     Decl(String, Node<Expression>),
     Assn(String, Node<Expression>),

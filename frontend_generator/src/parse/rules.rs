@@ -5,19 +5,25 @@ use crate::Token;
 use crate::Expression;
 use crate::Node;
 
-use super::types::Grammar;
-use super::types::AstNode;
 use super::types::Symbol;
 use super::types::ProcessedSymbol;
 use super::types::Rule;
+
+// HOW TO ADD RULES 
+// Rules have to be added in the get_rules() function.
+// Each possible NonTerminal has to be added to the NonTerminal enum. Make sure to adjust
+// NON_TERMINAL_COUNT accordingly.
+// 
+// Each rule needs a generator that specifies how to convert the Non_Terminal to an element that
+// is part of Ast. Output has to be an AstNode, so if generator returns a type that can't be
+// represented by an AstNode yet, then add that type to AstNode enum.
 
 #[derive(Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 #[repr(u8)]
 pub enum NonTerminal {
     Expr,
     Stmt,
-    SPrime,
-    S
+    SPrime, S
 }
 pub const NON_TERMINAL_COUNT: usize = 4;
 
@@ -27,6 +33,11 @@ impl NonTerminal {
     }
 }
 
+#[derive(Debug)]
+pub enum AstNode {
+    S(Statement),
+    E(Expression)
+}
 
 fn rule<F>(
     lhs: NonTerminal,
@@ -34,7 +45,7 @@ fn rule<F>(
     reduce: F
 ) -> Rule
 where
-    F: Fn(Vec<ProcessedSymbol>, &Grammar) -> AstNode + 'static
+    F: Fn(Vec<ProcessedSymbol>) -> AstNode + 'static
 {
     Rule {
         lhs,
@@ -68,7 +79,7 @@ pub fn get_rules() -> Vec<Rule> {
     // value, but make sure that you ALWAYS USE SAME VALUE
     //
     // Can otherwise falsely lead to conflicts in parser
-    vec!{
+    /*vec!{
         rule(
             NonTerminal::SPrime,
             vec![N(NonTerminal::S)],
@@ -83,16 +94,16 @@ pub fn get_rules() -> Vec<Rule> {
             vec![T(Token::Eq)],
             |_, _| AstNode::E(Val(5))
         ),
-    }
-    /*vec![
+    }*/
+    vec![
         rule(
             NonTerminal::Expr,
             vec![N(NonTerminal::Expr), T(Token::Plus), T(Token::Int(0))],
-            |mut s, g| {
-                let e2 = s.pop().unwrap().convert(g);
+            |mut s| {
+                let e2 = s.pop().unwrap().convert();
                 let e2 = Box::new(ast_node_to_expr(e2));
                 s.pop(); // "+"
-                let e1 = s.pop().unwrap().convert(g);
+                let e1 = s.pop().unwrap().convert();
                 let e1 = Box::new(ast_node_to_expr(e1));
                 AstNode::E(Add(e1, e2))
             }
@@ -100,10 +111,10 @@ pub fn get_rules() -> Vec<Rule> {
         rule(
             NonTerminal::Expr,
             vec![T(Token::Int(0))],
-            |mut l, _| {
+            |mut l| {
                 let v = l.pop().unwrap().int(); 
                 AstNode::E(Val(v))
             }
         )
-    ]*/
+    ]
 }

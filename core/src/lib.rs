@@ -12,5 +12,7 @@ pub fn compile(program: &str) {
 
     println!("Completed lex");
 
-    let _parser = parse::get_parser();
+    let parser = parse::get_parser();
+    let ast = parser.parse(tokens);
+    println!("{:?}", ast);
 }

@@ -2,8 +2,9 @@ use std::collections::{VecDeque, HashMap};
 
 use serde::{Serialize, Deserialize};
 
-use super::types::{Symbol, Grammar, Rule};
-use super::rules::{NON_TERMINAL_COUNT};
+use super::types::{Symbol, Grammar, Rule, ProcessedSymbol};
+use super::rules::{NON_TERMINAL_COUNT, AstNode};
+use crate::ast::Node;
 use crate::token::{Token, TOKEN_COUNT};
 
 const INVALID_SYMBOL: usize = usize::MAX;
@@ -14,14 +15,14 @@ struct ParserStateRule<'a> {
     pub index: usize, // Index of rule in grammar
     pub rule: &'a Rule,
     pub lookahead: Vec<Token>,
-    pub dot_pos: usize // 0 represents right at the beginning. Tells us which symbol is in front
+    pub dot_pos: usize, // 0 represents right at the beginning. Tells us which symbol is in front
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 enum Action {
     None,
     Shift(usize),
-    Reduce(usize) // Index of rule to be applied
+    Reduce(usize), // Index of rule to be applied
 }
 
 #[derive(Debug)]
@@ -319,6 +320,72 @@ impl ParserDFA {
         }
 
         dfa
+    }
+
+    pub fn parse(&self, input: Vec<Node<Token>>, grammar: &Grammar) -> Result<AstNode, &str> {
+        let mut input = input;
+        let mut current_state = self.get_start_state();
+        let mut processed: Vec<(ProcessedSymbol, usize)> = Vec::new();
+
+        // Reverse input, so we can pop from back
+        input.reverse();
+
+        while let Some(node) = input.pop() {
+            let token = node.get();
+            let action = self.action_table[current_state][token.index()];
+            println!("{:?}", token);
+            match action {
+                Action::None => return Err("No action for token"),
+                Action::Shift(next_state) => {
+                    processed.push((ProcessedSymbol::T(node), next_state));
+                    current_state = next_state;
+                },
+                Action::Reduce(index) => {
+                    let rule = &grammar[index];
+                    let non_terminal = rule.lhs;
+
+                    // get last elements of processed
+                    let symbols: Vec<ProcessedSymbol> = processed
+                        .split_off(processed.len()-rule.rhs.len())
+                        .into_iter()
+                        .map(|(s, _)| s)
+                        .collect();
+                    
+                    // TO DO: for now we're just taking location of first symbol
+                    let loc = symbols[0].get_loc().clone();
+                    let new_node = (rule.generator)(symbols);
+                    let new_processed = ProcessedSymbol::N(
+                        Node::new(
+                            (non_terminal ,new_node), 
+                            loc
+                        )
+                    );
+                    
+                    // Compute new state
+                    current_state = processed.last().unwrap().1;
+                    let new_state = self.goto_table[current_state][non_terminal.index()];
+                    if new_state == INVALID_SYMBOL {
+                        return Err("No goto action for nonterminal");
+                    }
+
+                    processed.push((new_processed, new_state));
+                    current_state=new_state;
+                }
+            }
+        }
+        
+        // If all went well we should have only final NonTerminal at end
+        if processed.len() != 1 {
+            return Err("Parse error");
+        }
+        
+        // Extract AstNode from last NonTerminal
+        if let Some((ProcessedSymbol::N(n), _)) = processed.pop() {
+            let ((_, ast), _) = n.extract(); 
+            return Ok(ast); 
+        }
+
+        Err("Parse error")
     }
 }
 

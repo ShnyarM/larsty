@@ -1,7 +1,8 @@
-use super::automaton::{NFA, DFA, CompressedDFA, EPSILON_CHAR};
 use std::{fs::File, io::Write, env, path::PathBuf};
 
-pub use super::regexp::Regexp;
+use super::automaton::{NFA, DFA, CompressedDFA, EPSILON_CHAR};
+use super::regexp::Regexp;
+use crate::ast::Node;
 
 /// Models a complete lexer. Includes the dfa and the actions for each rule.
 pub struct Lexer<T> {
@@ -78,10 +79,18 @@ impl<T> Lexer<T>{
         return Lexer { dfa, token_generators: generators }
     }
 
-    pub fn lex(&self, input:&str) -> Result<Vec<T>, &str> {
+    pub fn lex(&self, input:&str) -> Result<Vec<Node<T>>, &str> {
         let actions = self.dfa.longest_matching(input)?;
 
-        let result = actions.iter().map(|(action, str)| self.token_generators[*action as usize](str)).collect();
+        let result = actions
+            .into_iter()
+            .map(|n| {
+                let ((action, str), loc) = n.extract();
+                let token = self.token_generators[action as usize](str);
+                Node::new(token, loc)
+            })
+            .collect();
+
         Ok(result)
     }
 }

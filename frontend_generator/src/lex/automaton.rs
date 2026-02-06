@@ -1,5 +1,8 @@
 use std::{cmp::max, collections::{HashMap, HashSet, VecDeque}};
+
 use serde::{Serialize, Deserialize};
+
+use crate::{Location, Node};
 
 pub const EPSILON_CHAR: u8 = 0;
 const ALPHABET_SIZE: usize = 256;
@@ -270,7 +273,10 @@ impl DFA{
     /// Performs longest matching on the input. Returns the recognized tokens as a list of matched
     /// actions.
     /// Returns Err when there was a lexing error.
-    pub fn longest_matching<'a>(&self, input:&'a str) -> Result<Vec<(i32, &'a str)>, &str> {
+    pub fn longest_matching<'a>(&self, input:&'a str) -> Result<Vec<Node<(i32, &'a str)>>, &str> {
+        let mut line = 1;
+        let mut line_char = 0;
+
         let mut s = self.get_start_state();
         let mut actions = Vec::new();
 
@@ -279,12 +285,16 @@ impl DFA{
 
         let mut last_accept_action = -1;
         let mut last_accept_byte = 0;
+        let mut last_accept_line = 0;
+        let mut last_accept_line_char = 0;
         let mut last_consumed_byte = 0;
 
         while i < bytes.len() {
             let b = bytes[i];
             if b == b'\n' {
                 i += 1;
+                line += 1;
+                line_char = 0;
                 continue;
             }
 
@@ -293,10 +303,13 @@ impl DFA{
             if next_state != INVALID_SYMBOL {
                 s = next_state;
                 i += 1;
+                line_char += 1;
 
                 if self.actions[s] != NOT_ACCEPT {
                     last_accept_byte = i;
                     last_accept_action = self.actions[s];
+                    last_accept_line = line;
+                    last_accept_line_char = line_char;
                 }
                 continue;
             }
@@ -305,7 +318,9 @@ impl DFA{
             if last_accept_action != -1 {
                 // Consume until this point
                 let detected = &input[last_consumed_byte as usize..last_accept_byte as usize];
-                actions.push((last_accept_action, detected));
+
+                let location = Location::new(last_accept_line, last_accept_line_char);
+                actions.push(Node::new((last_accept_action, detected), location));
                 last_consumed_byte = last_accept_byte;
 
                 // Return state
@@ -327,7 +342,9 @@ impl DFA{
 
         // consume remaining
         let detected = &input[last_consumed_byte as usize..last_accept_byte as usize];
-        actions.push((last_accept_action, detected));
+
+        let location = Location::new(last_accept_line, last_accept_line_char);
+        actions.push(Node::new((last_accept_action, detected), location));
 
         Ok(actions)
     }
