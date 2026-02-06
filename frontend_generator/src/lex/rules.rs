@@ -1,4 +1,4 @@
-use super::Regexp;
+use super::regexp::Regexp;
 use crate::Token;
 
 type TokenGen = dyn Fn(&str) -> Token;
@@ -25,6 +25,7 @@ pub fn get_rules() -> Vec<(Regexp, Box<TokenGen>)> {
         )
     );
 
+    let int = Regexp::rep(Regexp::digit());
     let identifier = Regexp::concat(Regexp::letter(), Regexp::rep(id_chars));
 
     vec![
@@ -33,6 +34,7 @@ pub fn get_rules() -> Vec<(Regexp, Box<TokenGen>)> {
         keyword("let",      Let),
         keyword("==",       EqEq),
         keyword("=",        Eq),
+        rule(int,           |i| Int(i.parse::<i32>().unwrap())),
         rule(identifier,    |s| Id(String::from(s.trim()))),
     ]
 }

@@ -3,7 +3,6 @@ mod automaton;
 mod lexer;
 mod regexp;
 
-pub use regexp::Regexp;
 pub use lexer::Lexer;
 pub use rules::get_rules;
 
