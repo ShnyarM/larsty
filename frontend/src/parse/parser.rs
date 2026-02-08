@@ -27,7 +27,8 @@ impl Parser {
         let json = serde_json::to_string(&compressed_dfa).unwrap();
         write!(file, "{}", json).unwrap();
     }
-
+    
+    /// Generates a complete Parser from given grammar
     pub fn generate(grammar: Grammar) -> Parser {
         let dfa = ParserDFA::generate(&grammar);
 

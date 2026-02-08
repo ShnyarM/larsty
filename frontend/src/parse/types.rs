@@ -1,9 +1,10 @@
-use std::{collections::HashMap, fmt};
+use std::fmt;
 
 use crate::{Node, Token, Location};
 use super::rules::{AstNode, NonTerminal};
 
-/// Used to describe rules in the grammar
+/// Used to describe rules in the grammar. Allows to use Terminals and NonTerminals in a single
+/// type
 #[derive(PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub enum Symbol {
     T(Token),
@@ -18,14 +19,17 @@ pub enum ProcessedSymbol {
     N(NonTerminal, AstNode)
 }
 
+/// Type of generator that creates an AstNode
 pub type RuleGenerator = Box<dyn Fn(Vec<ProcessedSymbol>) -> AstNode>;
 
+/// Rule in a grammar
 pub struct Rule {
     pub lhs: NonTerminal,
     pub rhs: Vec<Symbol>,
     pub generator: RuleGenerator 
 }
 
+/// Used for associativity of operators
 #[derive(Clone, Copy)]
 pub enum Associativity {
     Right,
@@ -33,10 +37,11 @@ pub enum Associativity {
     NonAssoc
 }
 
+/// Final grammar
 pub struct Grammar {
     pub rules: Vec<Rule>,
-    pub precedence: Vec<(Token, usize)>,
-    pub associativity: Vec<(Token, Associativity)>
+    pub precedence: Vec<(Token, usize)>, // Maps operators to precedence value
+    pub associativity: Vec<(Token, Associativity)> // Maps operators to associativity
 } 
 
 impl Grammar {
@@ -56,7 +61,7 @@ impl Grammar {
             .unwrap_or(Associativity::NonAssoc)
     }
 
-    pub fn get_rule_precedence(&self, index: usize) -> (usize, Associativity) {
+    pub fn get_rule_precedence(&self, index: usize) -> Option<(usize, Associativity)> {
         let mut last_token: &Token = &Token::EOF;
         let mut found = false;
 
@@ -68,15 +73,16 @@ impl Grammar {
         }
 
         if !found {
-            panic!("No terminal present in rule");
+            return None;
         }
         
         let i = last_token.index();
 
-        (self.get_precedence_index(i), self.get_assoc_index(i))
+        Some((self.get_precedence_index(i), self.get_assoc_index(i)))
     }
 }
 
+// Some helper functions for generators
 impl ProcessedSymbol {
     pub fn loc(&self) -> &Location {
         match self {
@@ -130,6 +136,7 @@ impl ProcessedSymbol {
     }
 }
 
+// Sorting implementation, needed to sort certain types
 impl PartialEq for Rule {
     fn eq(&self, other: &Self) -> bool {
         self.lhs == other.lhs && self.rhs == other.rhs

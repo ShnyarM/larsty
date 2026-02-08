@@ -232,16 +232,17 @@ impl DFA{
         new_dfa.set_state_count(partitions.len()); 
 
         // reorder partition so that partition that contains start is at beginning
-        if let Some(pos) = partitions.iter().position(|v| v.contains(&0)) {
-            if pos != 0 {
+        let start_state = self.get_start_state();
+        if let Some(pos) = partitions.iter().position(|v| v.contains(&start_state)) {
+            if pos != start_state {
                 // update state to partition mapping
-                for s in partitions[0].iter() {
+                for s in partitions[start_state].iter() {
                     state_to_partition[*s] = pos;
                 }
                 for s in partitions[pos].iter() {
-                    state_to_partition[*s] = 0;
+                    state_to_partition[*s] = start_state;
                 }
-                partitions.swap(0, pos);
+                partitions.swap(start_state, pos);
             }
         }
 
@@ -282,6 +283,10 @@ impl DFA{
     /// actions.
     /// Returns Err when there was a lexing error.
     pub fn longest_matching<'a>(&self, input:&'a str) -> Result<Vec<Node<(i32, &'a str)>>, &str> {
+        if input.len() == 0 {
+            return Ok(Vec::new());
+        }
+
         let mut line = 1;
         let mut line_char = 0;
 

@@ -82,6 +82,8 @@ impl<T> Lexer<T>{
     pub fn lex(&self, input:&str) -> Result<Vec<Node<T>>, &str> {
         let actions = self.dfa.longest_matching(input)?;
 
+        println!("{:?}", actions);
+
         let result = actions
             .into_iter()
             .map(|n| {

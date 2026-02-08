@@ -1,15 +1,5 @@
-use std::vec;
-
-use crate::Statement;
-use crate::Token;
-use crate::Expression;
-use crate::Node;
-use crate::parse::types::Grammar;
-
-use super::types::Symbol;
-use super::types::ProcessedSymbol;
-use super::types::Rule;
-use super::types::Associativity;
+use crate::{Statement, Token, Expression, Node};
+use super::types::{Grammar, Symbol, ProcessedSymbol, Rule, Associativity};
 
 // HOW TO ADD RULES 
 // Rules have to be added in the get_rules() function.
@@ -29,6 +19,7 @@ pub enum NonTerminal {
 }
 
 impl NonTerminal {
+    // UPDATE THIS!!!
     pub const COUNT: usize = 3;
 
     pub fn index(&self) -> usize {
@@ -36,12 +27,14 @@ impl NonTerminal {
     }
 }
 
+// Add a variant for each type the parser creates
 #[derive(Debug)]
 pub enum AstNode {
     S(Node<Statement>),
     E(Node<Expression>)
 }
 
+// Define some helper function to make generators simpler
 impl AstNode {
     pub fn to_expr(self) -> Node<Expression> {
         match self {
@@ -58,6 +51,7 @@ impl AstNode {
     }
 }
 
+// Helper function to make adding rules easier
 fn rule<F>(
     lhs: NonTerminal,
     rhs: Vec<Symbol>,
@@ -73,6 +67,7 @@ where
     }
 }
 
+// Make changes to grammar here
 pub fn get_rules() -> Grammar {
     use Expression::*;
     use Symbol::*;
@@ -81,25 +76,41 @@ pub fn get_rules() -> Grammar {
     use Associativity::*;
     
     // IMPORTANT!!
-    // When adding a NonTerminnl that requires data in a rule (e.g. Int(i32)), just add a random
+    // When adding a NonTerminal that requires data in a rule (e.g. Int(i32)), just add a random
     // value, but make sure that you ALWAYS USE SAME VALUE
     //
     // Can otherwise falsely lead to conflicts in parser
+
+    // Define associativity of different operators
     let associativity = vec![
         (Plus, Left),
         (Minus, Left),
         (Mult, Left)
     ];
 
+    // Define precedence of different operators. Operators with a hihger value
+    // have higher precedence
     let precedence = vec![
         (Mult, 100),
         (Minus, 90),
         (Plus, 90)
     ];
 
+    // First rule has to be a start rule that consists of a NonTerminal followed by EOF
+    // Structure of each rule: rule(
+    //     NonTerminal that is on LHS of rule,
+    //     RHS of rule, represented as vector of Symbols,
+    //     Generator that takes in a list of ProcessedSymbols that correspond
+    //     to RHS and produces an AstNode
+    // )
     let rules = vec![
         rule(Start, vec![N(Expr), T(EOF)],
             |mut s| s.pop().unwrap().astnode()
+        ),
+        rule(
+            Expr,
+            vec![],
+            |_| AstNode::E(Node::no_loc(Val(6)))
         ),
         rule(
             Expr,
