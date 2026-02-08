@@ -52,7 +52,21 @@ impl<T> Node<T> {
 pub enum Expression {
     Add(Box<Node<Expression>>, Box<Node<Expression>>),
     Mul(Box<Node<Expression>>, Box<Node<Expression>>),
-    Val(i32)
+    Sub(Box<Node<Expression>>, Box<Node<Expression>>),
+    Neg(Box<Node<Expression>>),
+    Val(i32),
+}
+
+impl Expression {
+    pub fn eval(&self) -> i32 {
+        match self {
+            Expression::Add(e1, e2) => e1.get().eval() + e2.get().eval(),
+            Expression::Sub(e1, e2) => e1.get().eval() - e2.get().eval(),
+            Expression::Mul(e1, e2) => e1.get().eval() * e2.get().eval(),
+            Expression::Neg(e) => -e.get().eval(),
+            Expression::Val(v) => *v
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -3,8 +3,6 @@
 // 2. Increment TOKEN_COUNT
 // 3. Add index in token_index()
 
-pub const TOKEN_COUNT: usize = 9;
-
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)] 
 pub enum Token { 
     Function,
@@ -15,10 +13,14 @@ pub enum Token {
     If,
     EqEq,
     Plus,
+    Mult,
+    Minus,
     EOF
 }
 
 impl Token {
+    pub const COUNT: usize = 11;
+
     pub fn index(&self) -> usize {
        match self {
             Token::Function => 0,
@@ -29,7 +31,9 @@ impl Token {
             Token::If => 5,
             Token::EqEq => 6,
             Token::Plus => 7,
-            Token::EOF => 8
+            Token::Mult => 8,
+            Token::Minus => 9,
+            Token::EOF => 10
         }
     }
 }

@@ -1,4 +1,4 @@
-use frontend_generator::{Token, Node};
+use frontend::{Token, Node};
 
 mod lex;
 mod parse;
@@ -16,6 +16,8 @@ pub fn compile(program: &str) {
     println!("Completed lex");
 
     let parser = parse::get_parser();
-    let ast = parser.parse(tokens);
+    let ast = parser.parse(tokens).unwrap();
     println!("{:?}", ast);
+
+    println!("Result: {}", ast.to_expr().get().eval());
 }

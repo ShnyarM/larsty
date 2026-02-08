@@ -6,11 +6,11 @@ version = 4
 name = "core"
 version = "0.1.0"
 dependencies = [
- "frontend_generator",
+ "frontend",
 ]
 
 [[package]]
-name = "frontend_generator"
+name = "frontend"
 version = "0.1.0"
 dependencies = [
  "serde",

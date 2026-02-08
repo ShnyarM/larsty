@@ -1,4 +1,4 @@
-use frontend_generator::parse::{get_rules, Parser};
+use frontend::parse::{get_rules, Parser};
 
 // Gets created during build time by frontend_generator in frontend_generator/src/parse/parse.rs
 static DFA_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/parser.dfa"));

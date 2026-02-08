@@ -1,11 +1,10 @@
 use std::collections::{VecDeque, HashMap};
-
 use serde::{Serialize, Deserialize};
 
-use super::types::{Symbol, Grammar, Rule, ProcessedSymbol};
-use super::rules::{NON_TERMINAL_COUNT, AstNode};
+use super::types::{Symbol, Grammar, Rule, ProcessedSymbol, Associativity};
+use super::rules::{NonTerminal, AstNode};
 use crate::ast::Node;
-use crate::token::{Token, TOKEN_COUNT};
+use crate::token::Token;
 
 const INVALID_SYMBOL: usize = usize::MAX;
 
@@ -25,11 +24,19 @@ enum Action {
     Reduce(usize), // Index of rule to be applied
 }
 
+/// This struct gets used during the construction of the dfa, get turned to a ParserDFA at the end
+struct ConstructingParserDFA {
+    state_count: usize,
+    goto_table: Vec<[usize; NonTerminal::COUNT]>,
+    // (Action, precedence, Associativity)
+    action_table: Vec<[(Action, usize, Associativity); Token::COUNT]>
+}
+
 #[derive(Debug)]
 pub struct ParserDFA {
     state_count: usize,
-    goto_table: Vec<[usize; NON_TERMINAL_COUNT]>,
-    action_table: Vec<[Action; TOKEN_COUNT]>,
+    goto_table: Vec<[usize; NonTerminal::COUNT]>,
+    action_table: Vec<[Action; Token::COUNT]>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -39,26 +46,43 @@ pub struct CompressedParserDFA {
     action_table: Vec<HashMap<usize, Action>>
 }
 
-// TO DO: Make this more efficient by not always recomputing
-fn first(symbol: &Symbol, grammar: &Grammar) -> Vec<Token> {
+// TO DO: check if caching works
+// TO DO: Make empty rules work
+fn first(symbol: &Symbol, grammar: &Grammar, first_cache: &mut Vec<(NonTerminal, Vec<Token>)>) -> Vec<Token> {
     match symbol {
         Symbol::T(t) => vec![t.clone()],
         Symbol::N(n) => {
+            // Check if we can find in cache
+            for (non_terminal, list) in first_cache.iter() {
+                if *non_terminal == *n {
+                    println!("Avoided recomp");
+                    return list.clone();
+                }
+            }
+            println!("Didnt Avoid recomp");
+
             let mut result = Vec::new();
-            for r in grammar {
+            for r in grammar.rules.iter() {
                 if r.lhs == *n {
                     // If we have a panic here this means we have an epsilon rule, not yet
                     // supported
-                    result.append(&mut first(&r.rhs[0], grammar));
+                    result.append(&mut first(&r.rhs[0], grammar, first_cache));
                 }
             } 
+
+            // Add to cache
+            first_cache.push((*n, result.clone()));
             result
         }
     }
 }
 
 /// Compute the closure for a set of rules
-fn state_closure<'a>(state_rules: Vec<ParserStateRule<'a>>, grammar: &'a Grammar) -> Vec<ParserStateRule<'a>> {
+fn state_closure<'a>(
+    state_rules: Vec<ParserStateRule<'a>>, 
+    grammar: &'a Grammar,
+    first_cache: &mut Vec<(NonTerminal, Vec<Token>)>
+) -> Vec<ParserStateRule<'a>> {
     let mut state_rules = state_rules;
     let mut to_process: VecDeque<usize> = VecDeque::new();
     
@@ -76,13 +100,13 @@ fn state_closure<'a>(state_rules: Vec<ParserStateRule<'a>>, grammar: &'a Grammar
             
             // Check if there is symbol ahead
             if let Some(s) = &r.rule.rhs.get((r.dot_pos+1) as usize) {
-                lookahead.append(&mut first(s, grammar));
+                lookahead.append(&mut first(s, grammar, first_cache));
             } else { 
                 // otherwise use already existing lookahead
                 lookahead = r.lookahead.clone();
             }
 
-            for (i, g) in grammar.iter().enumerate() {
+            for (i, g) in grammar.rules.iter().enumerate() {
                 if g.lhs == *n { // We have found rule with same nonterminal, add
                     let new_rule = ParserStateRule::new(&grammar, i, lookahead.clone());
                     
@@ -112,7 +136,7 @@ impl<'a> ParserStateRule<'a> {
     fn new<'t>(grammar: &'t Grammar, index: usize, lookahead: Vec<Token>) -> ParserStateRule<'t> {
         ParserStateRule {
             index,
-            rule: &grammar[index],
+            rule: &grammar.rules[index],
             lookahead,
             dot_pos: 0
         }
@@ -122,7 +146,7 @@ impl<'a> ParserStateRule<'a> {
     fn increment<'t>(&self, grammar: &'t Grammar) -> ParserStateRule<'t> {
         ParserStateRule { 
             index: self.index, 
-            rule: &grammar[self.index], 
+            rule: &grammar.rules[self.index], 
             lookahead: self.lookahead.clone(), 
             dot_pos: self.dot_pos+1 
         }
@@ -134,15 +158,105 @@ impl<'a> ParserStateRule<'a> {
     }
 }
 
-impl ParserDFA {
-    fn new() -> ParserDFA {
-        ParserDFA { 
+impl ConstructingParserDFA {
+    fn new() -> ConstructingParserDFA {
+        ConstructingParserDFA { 
             state_count: 0, 
             goto_table: Vec::new(), 
             action_table: Vec::new() 
         }
     }
 
+    fn add_state(&mut self) {
+        self.state_count += 1;
+        self.goto_table.push([INVALID_SYMBOL; NonTerminal::COUNT]);
+        self.action_table.push([(Action::None, 0, Associativity::NonAssoc); Token::COUNT]);
+    }
+
+    /// Takes in new action for specific lookahead and state and decides to keep new or old one
+    fn solve_conflict(&mut self, state:usize, token: usize, new_action:(Action, usize, Associativity)) {
+        let (cur_action, cur_precedence, _) = self.action_table[state][token];
+        let (new_action, new_precedence, new_assoc) = new_action;
+
+        if cur_action == Action::None {
+            self.action_table[state][token] = (
+                new_action,
+                new_precedence,
+                new_assoc
+            );
+            return;
+        }
+
+        // We have conflict, resolve
+        
+        // Dont do anything if precedence is lower
+        if cur_precedence > new_precedence {
+            return;
+        }
+
+        if cur_precedence < new_precedence {
+            self.action_table[state][token] = (
+                new_action,
+                new_precedence,
+                new_assoc
+            );  
+            return;
+        }
+
+        // Same precedence, solve with associativity 
+        match new_assoc {
+            // We take reduce if associativity is left
+            Associativity::Left => {
+                if let Action::Shift(_) = cur_action {
+                    self.action_table[state][token] = (
+                        new_action,
+                        new_precedence,
+                        new_assoc
+                    );
+                }
+            },
+            // We take shift if associativity is right
+            Associativity::Right => {
+                if let Action::Reduce(_) = cur_action {
+                    self.action_table[state][token] = (
+                        new_action,
+                        new_precedence,
+                        new_assoc
+                    );
+                }
+            }
+            Associativity::NonAssoc => panic!("Shift/Reduce conflict, caused by NonAssoc"),
+        }
+    }
+
+    /// Add shifts action to dfa. Takes index of token as input
+    /// Uses precedence and associativity to solve conflicts
+    fn add_shift_index(&mut self, state: usize, token: usize, next_state: usize, grammar: &Grammar) {
+        let new_action = Action::Shift(next_state);
+        let new_precedence = grammar.get_precedence_index(token);
+        let new_assoc = grammar.get_assoc_index(token);
+
+        self.solve_conflict(state, token, (new_action, new_precedence, new_assoc));
+    }
+
+    fn add_reduce(&mut self, state: usize, rule: &ParserStateRule, grammar: &Grammar) {
+        for token in rule.lookahead.iter() {
+            let (precedence, assoc) = grammar.get_rule_precedence(rule.index);
+            let action = Action::Reduce(rule.index);
+            self.solve_conflict(state, token.index(), (action, precedence, assoc));
+        }
+    }
+
+    /// Adds goto to dfa, based on index of nonterminal
+    fn add_goto_index(&mut self, state: usize, non_terminal: usize, next_state: usize) {
+        if self.goto_table[state][non_terminal] != INVALID_SYMBOL {
+            panic!("Goto Conflict");
+        }
+        self.goto_table[state][non_terminal] = next_state;
+    }
+}
+
+impl ParserDFA {
     pub fn compress(&self) -> CompressedParserDFA {
         // Copy goto
         let mut goto_table = Vec::new();
@@ -175,7 +289,7 @@ impl ParserDFA {
         // Copy goto
         let mut goto_table = Vec::new();
         for (i, t) in compressed.goto_table.iter().enumerate() {
-            goto_table.push([INVALID_SYMBOL; NON_TERMINAL_COUNT]);
+            goto_table.push([INVALID_SYMBOL; NonTerminal::COUNT]);
             for (symbol, s2) in t.iter() {
                 goto_table[i][*symbol] = *s2;
             } 
@@ -184,7 +298,7 @@ impl ParserDFA {
         // Copy actions
         let mut action_table = Vec::new();
         for (i, t) in compressed.action_table.iter().enumerate() {
-            action_table.push([Action::None; TOKEN_COUNT]);
+            action_table.push([Action::None; Token::COUNT]);
             for (symbol, s2) in t.iter() {
                 action_table[i][*symbol] = *s2;
             } 
@@ -192,40 +306,20 @@ impl ParserDFA {
 
         ParserDFA { state_count: compressed.state_count, goto_table, action_table }
     }
-    
-    fn add_state(&mut self) {
-        self.state_count += 1;
-        self.goto_table.push([INVALID_SYMBOL; NON_TERMINAL_COUNT]);
-        self.action_table.push([Action::None; TOKEN_COUNT]);
-    }
 
+    fn from_constructing(dfa: ConstructingParserDFA) -> ParserDFA {
+        let action_table = dfa.action_table
+            .into_iter()
+            .map(|l| {
+                std::array::from_fn(|i| l[i].0)
+            })
+            .collect();
+
+        ParserDFA { state_count: dfa.state_count, goto_table: dfa.goto_table, action_table }
+    }
+    
     fn get_start_state(&self) -> usize {
         0
-    }
-
-    /// Add shifts action to dfa. Takes index of token as input
-    fn add_shift_index(&mut self, state: usize, token: usize, next_state: usize) {
-        if self.action_table[state][token] != Action::None {
-            panic!("Shift conflict");
-        }
-        self.action_table[state][token] = Action::Shift(next_state);
-    }
-
-    fn add_reduce(&mut self, state: usize, rule: &ParserStateRule) {
-        for token in rule.lookahead.iter() {
-            if self.action_table[state][token.index()] != Action::None {
-                panic!("Reduce conflict");
-            }
-            self.action_table[state][token.index()] = Action::Reduce(rule.index);
-        }
-    }
-
-    /// Adds goto to dfa, based on index of nonterminal
-    fn add_goto_index(&mut self, state: usize, non_terminal: usize, next_state: usize) {
-        if self.goto_table[state][non_terminal] != INVALID_SYMBOL {
-            panic!("Goto Conflict");
-        }
-        self.goto_table[state][non_terminal] = next_state;
     }
 
     pub fn generate(grammar: &Grammar) -> ParserDFA {
@@ -233,7 +327,10 @@ impl ParserDFA {
         type TokenIndex = usize;
         type NonTerminalIndex = usize;
 
-        let mut dfa = ParserDFA::new();
+        let mut dfa = ConstructingParserDFA::new();
+        
+        // This caches the results of the first() function
+        let mut first_cache = Vec::new();
 
         // Index in this vec corresponds to index in dfa
         let mut parser_states: Vec<Vec<ParserStateRule>> = Vec::new();
@@ -241,7 +338,8 @@ impl ParserDFA {
         // Create first state
         let first_state = state_closure(
             vec![ParserStateRule::new(&grammar, 0, vec![])], 
-            &grammar
+            &grammar,
+            &mut first_cache
         );
         parser_states.push(first_state);
         dfa.add_state();
@@ -261,7 +359,7 @@ impl ParserDFA {
             for rule in state.iter() {
                 // Check if this is reduce rule
                 if rule.dot_pos == rule.rule.rhs.len() {
-                    dfa.add_reduce(i, rule);
+                    dfa.add_reduce(i, rule, grammar);
                     continue;
                 }
                 
@@ -286,23 +384,23 @@ impl ParserDFA {
 
             // For each terminal after dot compute new state and add transition
             for (token_index, rules) in terminals.into_iter() {
-                let closure = state_closure(rules, grammar);
+                let closure = state_closure(rules, grammar, &mut first_cache);
                 
                 if let Some(s) = parser_states.iter().position(|s| **s==closure) {
                     // exact same state already exists, just add transition
-                    dfa.add_shift_index(i, token_index, s);
+                    dfa.add_shift_index(i, token_index, s, grammar);
                 } else {
                     // Add state to dfa
                     parser_states.push(closure);
                     dfa.add_state();
                     let new_state = parser_states.len()-1;
-                    dfa.add_shift_index(i, token_index, new_state);
+                    dfa.add_shift_index(i, token_index, new_state, grammar);
                 }
             }
 
             // For each nonterminal after dot compute new state and add transition
             for (non_terminal_index, rules) in non_terminals.into_iter() {
-                let closure = state_closure(rules, grammar);
+                let closure = state_closure(rules, grammar, &mut first_cache);
                 
                 if let Some(s) = parser_states.iter().position(|s| **s==closure) {
                     // exact same state already exists, just add transition
@@ -317,8 +415,9 @@ impl ParserDFA {
             }
             i+=1;
         }
-
-        dfa
+        
+        // TO DO: LALR(1)
+        ParserDFA::from_constructing(dfa)
     }
 
     pub fn parse(&self, input: Vec<Node<Token>>, grammar: &Grammar) -> Result<AstNode, String> {
@@ -328,6 +427,7 @@ impl ParserDFA {
 
         while let Some(node) = input.pop_front() {
             let token = node.get();
+            println!("{:?}", token);
             let action = self.action_table[current_state][token.index()];
             match action {
                 Action::None => return Err(format!("No action for token {:?}, in state {current_state}", token)),
@@ -336,9 +436,9 @@ impl ParserDFA {
                     current_state = next_state;
                 },
                 Action::Reduce(index) => {
-                    let rule = &grammar[index];
+                    println!("Reduce, index {index}");
+                    let rule = &grammar.rules[index];
                     let non_terminal = rule.lhs;
-
 
                     // get last elements of processed
                     let symbols: Vec<ProcessedSymbol> = processed
@@ -347,14 +447,9 @@ impl ParserDFA {
                         .map(|(s, _)| s)
                         .collect();
                     
-                    // TO DO: for now we're just taking location of first symbol
-                    let loc = symbols[0].get_loc().clone();
-                    let new_node = (rule.generator)(symbols);
                     let new_processed = ProcessedSymbol::N(
-                        Node::new(
-                            (non_terminal ,new_node), 
-                            loc
-                        )
+                        non_terminal,
+                        (rule.generator)(symbols)
                     );
                     
                     // Compute new state
@@ -370,25 +465,21 @@ impl ParserDFA {
                     processed.push((new_processed, new_state));
                     current_state=new_state;
 
-                    // If we have just reduced with an EOF, then stop
-                    if *node.get() == Token::EOF {
-                        break;
-                    }
-
                     // Put processed token back into queue
                     input.push_front(node);
                 }
             }
         }
         
-        // If all went well we should have only final NonTerminal at end
-        if processed.len() != 1 {
-            return Err(String::from("Parse error"));
+        // If all went well we should have only final NonTerminal with EOF at end
+        if processed.len() != 2 {
+            println!("Count: {}, {:?}", processed.len(), processed);
+            return Err(String::from("Parse error, more than one processed Symbol at the end"));
         }
-        
+
+        processed.pop();
         // Extract AstNode from last NonTerminal
-        if let Some((ProcessedSymbol::N(n), _)) = processed.pop() {
-            let ((_, ast), _) = n.extract(); 
+        if let Some((ProcessedSymbol::N(_, ast), _)) = processed.pop() {
             return Ok(ast); 
         }
 

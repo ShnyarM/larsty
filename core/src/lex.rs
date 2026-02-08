@@ -1,5 +1,5 @@
-use frontend_generator::lex::{get_rules, Lexer};
-use frontend_generator::Token;
+use frontend::lex::{get_rules, Lexer};
+use frontend::Token;
 
 // Gets created during build time by frontend_generator in frontend_generator/src/lex/lexer.rs
 static DFA_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/lexer.dfa"));
