@@ -1,3 +1,5 @@
+use frontend_generator::{Token, Node};
+
 mod lex;
 mod parse;
 
@@ -7,7 +9,8 @@ pub fn compile(program: &str) {
 
     println!("Starting lex");
 
-    let tokens = lexer.lex(program).unwrap();
+    let mut tokens = lexer.lex(program).unwrap();
+    tokens.push(Node::no_loc(Token::EOF));
     println!("{:?}", tokens);
 
     println!("Completed lex");

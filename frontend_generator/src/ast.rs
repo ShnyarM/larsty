@@ -22,6 +22,10 @@ impl<T> Node<T> {
         Node { loc: l, elem }
     }
 
+    pub fn no_loc(elem: T) -> Node<T> {
+        Node { loc: Location::new(0, 0), elem }
+    }
+
     /// Returns all elements of this Node, destroying it in the process
     pub fn extract(self) -> (T, Location) {
         (self.elem, self.loc)

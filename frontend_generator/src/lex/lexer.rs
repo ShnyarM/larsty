@@ -90,7 +90,7 @@ impl<T> Lexer<T>{
                 Node::new(token, loc)
             })
             .collect();
-
+        
         Ok(result)
     }
 }

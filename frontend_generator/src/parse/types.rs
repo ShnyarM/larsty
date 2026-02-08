@@ -14,6 +14,7 @@ pub enum Symbol {
 /// NonTerminal additionally has the ProcessedSymbols that will be fed to generator to turn it into
 /// a AstNod, as well as index of generator that has to be used on it.
 /// Will be the output of the ParserDFA
+#[derive(Debug)]
 pub enum ProcessedSymbol {
     T(Node<Token>),
     N(Node<(NonTerminal, AstNode)>)

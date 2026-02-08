@@ -30,7 +30,6 @@ impl Parser {
 
     pub fn generate(grammar: Grammar) -> Parser {
         let dfa = ParserDFA::generate(&grammar);
-        println!("{:?}", dfa);
 
         Parser { dfa, grammar }
     }
@@ -47,7 +46,7 @@ impl Parser {
         return Parser { dfa, grammar }
     }
 
-    pub fn parse(&self, input: Vec<Node<Token>>) -> Result<AstNode, &str> {
+    pub fn parse(&self, input: Vec<Node<Token>>) -> Result<AstNode, String> {
         self.dfa.parse(input, &self.grammar)
     }
 }

@@ -88,7 +88,7 @@ fn state_closure<'a>(state_rules: Vec<ParserStateRule<'a>>, grammar: &'a Grammar
                     
                     // If we have rule that already has same core, just add lookahead
                     if let Some(other) = state_rules.iter_mut().find(|h| new_rule.eq_core(h)) {
-                        other.lookahead.append(&mut lookahead);
+                        other.lookahead.append(&mut lookahead.clone());
 
                         // Remove duplicates in lookahead
                         other.lookahead.sort();
@@ -240,7 +240,7 @@ impl ParserDFA {
 
         // Create first state
         let first_state = state_closure(
-            vec![ParserStateRule::new(&grammar, 0, vec![Token::EOF])], 
+            vec![ParserStateRule::new(&grammar, 0, vec![])], 
             &grammar
         );
         parser_states.push(first_state);
@@ -250,7 +250,6 @@ impl ParserDFA {
         while i < parser_states.len() {
             // i is index of state in dfa
             let state = &parser_states[i];
-            println!("State {i}: {:?}\n\n", state);
             
 
             // Collect all symbols that appear after dot
@@ -322,20 +321,16 @@ impl ParserDFA {
         dfa
     }
 
-    pub fn parse(&self, input: Vec<Node<Token>>, grammar: &Grammar) -> Result<AstNode, &str> {
-        let mut input = input;
+    pub fn parse(&self, input: Vec<Node<Token>>, grammar: &Grammar) -> Result<AstNode, String> {
+        let mut input: VecDeque<Node<Token>> = input.into_iter().collect();
         let mut current_state = self.get_start_state();
         let mut processed: Vec<(ProcessedSymbol, usize)> = Vec::new();
 
-        // Reverse input, so we can pop from back
-        input.reverse();
-
-        while let Some(node) = input.pop() {
+        while let Some(node) = input.pop_front() {
             let token = node.get();
             let action = self.action_table[current_state][token.index()];
-            println!("{:?}", token);
             match action {
-                Action::None => return Err("No action for token"),
+                Action::None => return Err(format!("No action for token {:?}, in state {current_state}", token)),
                 Action::Shift(next_state) => {
                     processed.push((ProcessedSymbol::T(node), next_state));
                     current_state = next_state;
@@ -343,6 +338,7 @@ impl ParserDFA {
                 Action::Reduce(index) => {
                     let rule = &grammar[index];
                     let non_terminal = rule.lhs;
+
 
                     // get last elements of processed
                     let symbols: Vec<ProcessedSymbol> = processed
@@ -362,21 +358,32 @@ impl ParserDFA {
                     );
                     
                     // Compute new state
-                    current_state = processed.last().unwrap().1;
+                    current_state = match processed.last() {
+                        Some(i) => i.1,
+                        None => self.get_start_state()
+                    };
                     let new_state = self.goto_table[current_state][non_terminal.index()];
                     if new_state == INVALID_SYMBOL {
-                        return Err("No goto action for nonterminal");
+                        return Err(String::from("No goto action for nonterminal"));
                     }
 
                     processed.push((new_processed, new_state));
                     current_state=new_state;
+
+                    // If we have just reduced with an EOF, then stop
+                    if *node.get() == Token::EOF {
+                        break;
+                    }
+
+                    // Put processed token back into queue
+                    input.push_front(node);
                 }
             }
         }
         
         // If all went well we should have only final NonTerminal at end
         if processed.len() != 1 {
-            return Err("Parse error");
+            return Err(String::from("Parse error"));
         }
         
         // Extract AstNode from last NonTerminal
@@ -385,7 +392,7 @@ impl ParserDFA {
             return Ok(ast); 
         }
 
-        Err("Parse error")
+        Err(String::from("Parse error"))
     }
 }
 

@@ -98,10 +98,20 @@ pub fn get_rules() -> Vec<Rule> {
     vec![
         rule(
             NonTerminal::Expr,
+            vec![N(NonTerminal::Expr), T(Token::EOF)],
+            |mut s| {
+                let e = s.pop().unwrap().convert();
+                let (n, _) = e.extract();
+                n
+            }
+        ),
+        rule(
+            NonTerminal::Expr,
             vec![N(NonTerminal::Expr), T(Token::Plus), T(Token::Int(0))],
             |mut s| {
-                let e2 = s.pop().unwrap().convert();
-                let e2 = Box::new(ast_node_to_expr(e2));
+                let e2 = s.pop().unwrap();
+                let e2_loc = e2.get_loc().clone();
+                let e2 = Box::new(Node::new(Val(e2.int()), e2_loc));
                 s.pop(); // "+"
                 let e1 = s.pop().unwrap().convert();
                 let e1 = Box::new(ast_node_to_expr(e1));

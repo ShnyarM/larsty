@@ -166,7 +166,7 @@ impl DFA{
         // Create initial partition based on action of state
         for (i, a) in self.actions.iter().enumerate() {
             partitions[(*a+1) as usize].push(i);
-            state_to_partition[i] = *a as usize;
+            state_to_partition[i] = (*a+1) as usize;
         }
 
         // Use transitions of compressed DFA, more effective here
@@ -191,6 +191,7 @@ impl DFA{
                     let mut transition_set: Vec<(u8, usize)> = transitions[*s]
                         .iter()
                         .map(|(k,v)| (*k, state_to_partition[*v]))
+                        //.map(|(k,v)| (*k, *v))
                         .collect();
                     transition_set.sort();
 
@@ -241,6 +242,13 @@ impl DFA{
                     state_to_partition[*s] = 0;
                 }
                 partitions.swap(0, pos);
+            }
+        }
+
+        // We've moved and removed some partitions, so we have to adjust state_to_partition mapping
+        for (i, p) in partitions.iter().enumerate() {
+            for s in p {
+                state_to_partition[*s] = i;
             }
         }
 
