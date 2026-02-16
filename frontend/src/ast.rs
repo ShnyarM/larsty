@@ -49,29 +49,68 @@ impl<T> Node<T> {
 }
 
 #[derive(Debug)]
-pub enum Expression {
-    Add(Box<Node<Expression>>, Box<Node<Expression>>),
-    Mul(Box<Node<Expression>>, Box<Node<Expression>>),
-    Sub(Box<Node<Expression>>, Box<Node<Expression>>),
-    Neg(Box<Node<Expression>>),
-    Val(i32),
+pub enum Type {
+    I32
 }
 
-impl Expression {
-    pub fn eval(&self) -> i32 {
-        match self {
-            Expression::Add(e1, e2) => e1.get().eval() + e2.get().eval(),
-            Expression::Sub(e1, e2) => e1.get().eval() - e2.get().eval(),
-            Expression::Mul(e1, e2) => e1.get().eval() * e2.get().eval(),
-            Expression::Neg(e) => -e.get().eval(),
-            Expression::Val(v) => *v
-        }
-    }
+#[derive(Debug)]
+pub enum RetType {
+    Type(Type),
+    Void
+}
+
+#[derive(Debug)]
+pub enum Bop {
+    Add,
+    Sub,
+    Mult
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Bop(Bop, Box<Node<Expression>>, Box<Node<Expression>>),
+    Id(String),
+    Val(i32)
 }
 
 #[derive(Debug)]
 pub enum Statement {
     Decl(String, Node<Expression>),
     Assn(String, Node<Expression>),
-    Expr(Node<Expression>)
+    Expr(Node<Expression>),
+    Ret(Node<Expression>)
+}
+
+pub type StatementList = Vec<Node<Statement>>;
+
+#[derive(Debug)]
+pub struct FunctionDecl {
+    pub name: String,
+    pub ret_type: RetType,
+    pub code: StatementList
+}
+
+impl FunctionDecl {
+    pub fn new(name: String, ret_type: RetType, code: StatementList) -> FunctionDecl {
+        FunctionDecl { 
+            name, 
+            ret_type, 
+            code 
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Program {
+    pub functions: Vec<Node<FunctionDecl>>
+}
+
+impl Program {
+    pub fn new() -> Program {
+        Program { functions: Vec::new() }
+    }
+
+    pub fn add_function(&mut self, func: Node<FunctionDecl>) {
+        self.functions.push(func);
+    }
 }

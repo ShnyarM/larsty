@@ -82,60 +82,6 @@ impl Grammar {
     }
 }
 
-// Some helper functions for generators
-impl ProcessedSymbol {
-    pub fn loc(&self) -> &Location {
-        match self {
-            ProcessedSymbol::N(_, n) => {
-                match n {
-                    AstNode::S(s) => s.loc(),
-                    AstNode::E(e) => e.loc()
-                }
-            },
-            ProcessedSymbol::T(t) => t.loc()
-        }
-    }
-
-    pub fn into_loc(self) -> Location {
-        match self {
-            ProcessedSymbol::N(_, n) => {
-                match n {
-                    AstNode::S(s) => s.into_loc(),
-                    AstNode::E(e) => e.into_loc()
-                }
-            },
-            ProcessedSymbol::T(t) => t.into_loc()
-        }
-    }
-
-    pub fn astnode(self) -> AstNode{
-        match self {
-            ProcessedSymbol::N(_, n) => n, 
-            _ => panic!("ProcessedSymbol conversion to astnode tried on token")
-        }
-    }
-
-    pub fn token(self) -> Node<Token> {
-        match self {
-            ProcessedSymbol::T(t) => t,
-            _ => panic!("ProcessedSymbol convertsion to token tried on NonTerminal")
-        }
-    }
-
-    pub fn int(&self) -> i32 {
-        match self {
-            ProcessedSymbol::T(n) => {
-                if let Token::Int(v) = n.get() {
-                    *v
-                } else {
-                    panic!("Not a number")
-                }
-            }
-            _ => panic!("Not a terminal")
-        }
-    }
-}
-
 // Sorting implementation, needed to sort certain types
 impl PartialEq for Rule {
     fn eq(&self, other: &Self) -> bool {

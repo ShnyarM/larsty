@@ -1,23 +1,10 @@
-use frontend::{Token, Node};
-
 mod lex;
 mod parse;
 
-pub fn compile(program: &str) {
-    let lexer = lex::get_lexer();
-    println!("{}", program);
+pub fn compile(program: &str) -> Result<String, String> {
+    let tokens = lex::lex_input(program)?;
+    let program = parse::parse_input(tokens)?;
+    println!("{:?}", program);
 
-    println!("Starting lex");
-
-    let mut tokens = lexer.lex(program).unwrap();
-    tokens.push(Node::no_loc(Token::EOF));
-    println!("{:?}", tokens);
-
-    println!("Completed lex");
-
-    let parser = parse::get_parser();
-    let ast = parser.parse(tokens).unwrap();
-    println!("{:?}", ast);
-
-    println!("Result: {}", ast.to_expr().get().eval());
+    Ok(String::from("Success"))
 }

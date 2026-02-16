@@ -32,6 +32,16 @@ pub fn get_rules() -> Vec<(Regexp, Box<TokenGen>)> {
         keyword("function", Function),
         keyword("if",       If),
         keyword("let",      Let),
+
+        keyword("(",       LParen),
+        keyword(")",       RParen),
+        keyword("{",       LBrack),
+        keyword("}",       RBrack),
+        keyword(";",       SemiColon),
+
+        keyword("i32",      I32),
+        keyword("void",      I32),
+
         keyword("==",       EqEq),
         keyword("=",        Eq),
         keyword("+",        Plus),

@@ -282,7 +282,7 @@ impl DFA{
     /// Performs longest matching on the input. Returns the recognized tokens as a list of matched
     /// actions.
     /// Returns Err when there was a lexing error.
-    pub fn longest_matching<'a>(&self, input:&'a str) -> Result<Vec<Node<(i32, &'a str)>>, &str> {
+    pub fn longest_matching<'a>(&self, input:&'a str) -> Result<Vec<Node<(i32, &'a str)>>, String> {
         if input.len() == 0 {
             return Ok(Vec::new());
         }
@@ -345,12 +345,12 @@ impl DFA{
             }
 
             // We have lexing error
-            return Err("Lexing error");
+            return Err(format!("Unexpected character {} at {}:{}", b as char, line, line_char));
         }
 
         // At end we check if we're at an accept state
         if self.actions[s] == NOT_ACCEPT {
-            return Err("Lexing error");
+            return Err(String::from("Lexing error"));
         }
 
         // consume remaining

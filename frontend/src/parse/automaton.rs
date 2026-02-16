@@ -1,4 +1,5 @@
 use std::collections::{VecDeque, HashMap};
+use std::mem;
 use serde::{Serialize, Deserialize};
 
 use super::types::{Symbol, Grammar, Rule, ProcessedSymbol, Associativity};
@@ -82,6 +83,7 @@ fn first(
                 }
             }
             println!("Didnt Avoid recomp");
+            println!("Computing {:?}", n);
 
             let mut result = Vec::new();
             let mut can_derive_epsilon = false;
@@ -601,11 +603,13 @@ impl ParserDFA {
     /// Parses a given TokenStream to an AST. Requires the grammar to have access to the generators
     /// that produce the AST nodes.
     pub fn parse(&self, input: Vec<Node<Token>>, grammar: &Grammar) -> Result<AstNode, String> {
-        let mut input: VecDeque<Node<Token>> = input.into_iter().collect();
+        let mut input = input;
         let mut current_state = self.get_start_state();
         let mut processed: Vec<(ProcessedSymbol, usize)> = Vec::new();
-
-        while let Some(node) = input.pop_front() {
+        
+        let mut index = 0;
+        while index < input.len() {
+            let node = &input[index];
             let token = node.get();
             println!("{:?}", token);
             let action = self.action_table[current_state][token.index()];
@@ -614,8 +618,14 @@ impl ParserDFA {
                     format!("No action for token {:?}, in state {current_state}",token)
                 ),
                 Action::Shift(next_state) => {
+                    // take ownership of node, replace value with garbage data
+                    let node = mem::replace(&mut input[index], Node::no_loc(Token::EOF));
+
                     processed.push((ProcessedSymbol::T(node), next_state));
                     current_state = next_state;
+
+                    // advance character
+                    index += 1;
                 },
                 Action::Reduce(index) => {
                     println!("Reduce, index {index}");
@@ -646,9 +656,6 @@ impl ParserDFA {
 
                     processed.push((new_processed, new_state));
                     current_state=new_state;
-
-                    // Put processed token back into queue
-                    input.push_front(node);
                 }
             }
         }

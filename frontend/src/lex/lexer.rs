@@ -79,7 +79,7 @@ impl<T> Lexer<T>{
         return Lexer { dfa, token_generators: generators }
     }
 
-    pub fn lex(&self, input:&str) -> Result<Vec<Node<T>>, &str> {
+    pub fn lex(&self, input:&str) -> Result<Vec<Node<T>>, String> {
         let actions = self.dfa.longest_matching(input)?;
 
         println!("{:?}", actions);

@@ -12,6 +12,13 @@ fn main() {
     let program = fs::read_to_string(file_path)
         .expect("Error reading the given file.");
 
-    core::compile(&program);
+    let result = core::compile(&program);
+    match result {
+        Ok(_) => { return; },
+        Err(e) => {
+            eprintln!("Compilation Failed: {}", e);
+            return;
+        }
+    }
 }
 
