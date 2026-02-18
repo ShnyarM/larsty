@@ -112,6 +112,10 @@ fn first(
 
             // If we can derive epsilon check all symbols that can come after
 
+            // Remove all duplicates
+            result.sort();
+            result.dedup();
+
             // Add to cache
             cache.push((*n, (result.clone(), can_derive_epsilon)));
             (result, can_derive_epsilon)
@@ -150,6 +154,10 @@ fn state_closure<'a>(
                 let (mut new_lookahead, epsilon) = first(s, grammar, first_cache);
                 lookahead.append(&mut new_lookahead);
 
+                if *n == NonTerminal::Block {
+                    println!("Block Lookahead: {:?}", lookahead);
+                }
+
                 if !epsilon {
                     can_derive_epsilon = false;
                     break;
@@ -157,9 +165,9 @@ fn state_closure<'a>(
                 i+=1;
             }  
 
-            // if we can derive epsilon, copy lookahead of already existing lookahead from rule 
+            // if we can derive epsilon, add lookahead of already existing lookahead from rule 
             if can_derive_epsilon {
-                lookahead = r.lookahead.clone();
+                lookahead.append(&mut r.lookahead.clone());
             }
             
             // Now we search for all rules with this nonterminal and add their rule to state
@@ -320,6 +328,10 @@ impl ConstructingParserDFA {
     }
 
     fn add_reduce(&mut self, state: usize, rule: &ParserStateRule, grammar: &Grammar) {
+        if rule.rule.lhs == NonTerminal::Block {
+            println!("Found block, lookahead: {:?}", rule.lookahead);
+
+        }
         for token in rule.lookahead.iter() {
             let (precedence, assoc) = grammar
                 .get_rule_precedence(rule.index)

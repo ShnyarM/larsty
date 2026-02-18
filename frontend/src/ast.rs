@@ -79,7 +79,9 @@ pub enum Statement {
     Assn(String, Node<Expression>),
     Block(StatementList),
     Expr(Node<Expression>),
-    Ret(Option<Node<Expression>>)
+    Ret(Option<Node<Expression>>),
+    While(Node<Expression>, StatementList),
+    If(Node<Expression>, StatementList, Option<StatementList>)
 }
 
 pub type StatementList = Vec<Node<Statement>>;

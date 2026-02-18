@@ -9,6 +9,8 @@ pub enum Token {
     Let,            // let
     If,             // if
     Return,         // return
+    While,          // while
+    Else,           // else
 
     LParen,         // (
     RParen,         // )
@@ -40,6 +42,8 @@ impl Token {
             Token::Let => 1,
             Token::If => 2,
             Token::Return => 3,
+            Token::While => 4,
+            Token::Else => 5,
 
             Token::LParen => 500,
             Token::RParen => 501,

@@ -19,7 +19,10 @@ pub enum NonTerminal {
     RetType,
     Expr,
     Stmt,
+    If,
+    Else,
     StmtList,
+    Block,
     Function,
     Program,
     Start 
@@ -27,7 +30,7 @@ pub enum NonTerminal {
 
 impl NonTerminal {
     // UPDATE THIS!!!
-    pub const COUNT: usize = 7;
+    pub const COUNT: usize = 11;
 
     pub fn index(&self) -> usize {
         *self as usize
@@ -43,7 +46,8 @@ pub enum AstNode {
     SL(StatementList),
     E(Node<Expression>),
     F(Node<FunctionDecl>),
-    P(Program)
+    P(Program),
+    Else(Option<StatementList>)
 }
 
 // Define some helper function to make generators simpler
@@ -94,6 +98,13 @@ impl AstNode {
         match self {
             AstNode::RT(s) => s,
             _ => panic!("AstNode is not a return type")
+        }
+    }
+
+    pub fn get_else(self) -> Option<StatementList> {
+        match self {
+            AstNode::Else(s) => s,
+            _ => panic!("AstNode is not an else")
         }
     }
 }
@@ -192,11 +203,9 @@ pub fn get_rules() -> Grammar {
         // ------------- FUNCTION ----------------
         rule(
             NonTerminal::Function,
-            vec![N(RetType), T(Id(String::from(""))), T(LParen), T(RParen), T(LBrack), N(StmtList), T(RBrack)],
+            vec![N(RetType), T(Id(String::from(""))), T(LParen), T(RParen), N(Block)],
             |mut l| {
-                l.pop(); // }
                 let list = l.pop().unwrap().astnode().stmt_list(); // statements
-                l.pop(); // {
                 l.pop(); // )
                 l.pop(); // (
                 let name = l.pop().unwrap().token().into_get().str(); // function name
@@ -226,6 +235,18 @@ pub fn get_rules() -> Grammar {
             NonTerminal::StmtList,
             vec![],
             |_| AstNode::SL(Vec::new())
+        ),
+
+        // ------------- BLOCK ----------------
+        rule(
+            NonTerminal::Block,
+            vec![T(LBrack), N(StmtList), T(RBrack)],
+            |mut l| {
+                l.pop(); // }
+                let list = l.pop().unwrap().astnode();
+                l.pop(); // {
+                list
+            }
         ),
 
         // ------------- STATEMENT ----------------
@@ -279,6 +300,64 @@ pub fn get_rules() -> Grammar {
                 l.pop(); // ;
                 let loc = l.pop().unwrap().token().into_loc();
                 AstNode::S(Node::new(Statement::Ret(None), loc))
+            }
+        ),
+        rule(   // --- WHILE ---
+            NonTerminal::Stmt,
+            vec![T(While), T(LParen), N(Expr), T(RParen), N(Block)],
+            |mut l| {
+                let list = l.pop().unwrap().astnode().stmt_list();
+                l.pop(); // )
+                let expr = l.pop().unwrap().astnode().expr();
+                l.pop(); // (
+                let loc = l.pop().unwrap().token().into_loc();
+                AstNode::S(Node::new(Statement::While(expr, list), loc))
+            }
+        ),
+        rule(   // --- IF ---
+            NonTerminal::Stmt,
+            vec![N(NonTerminal::If)],
+            |mut l| {
+                l.pop().unwrap().astnode()
+            }
+        ),
+
+        // ------------- IF ----------------, returns a statement
+        rule(
+            NonTerminal::If,
+            vec![T(Token::If), T(LParen), N(Expr), T(RParen), N(Block), N(NonTerminal::Else)],
+            |mut l| {
+                let e = l.pop().unwrap().astnode().get_else();
+                let list = l.pop().unwrap().astnode().stmt_list();
+                l.pop(); // )
+                let expr = l.pop().unwrap().astnode().expr();
+                l.pop(); // (
+                let loc = l.pop().unwrap().token().into_loc();
+                AstNode::S(Node::new(Statement::If(expr, list, e), loc))
+            }
+        ),
+
+        // ------------- ELSE ----------------, returns a Option<StatementList>
+        rule(
+            NonTerminal::Else,
+            vec![],
+            |_| AstNode::Else(None)
+        ),
+        rule( 
+            NonTerminal::Else,
+            vec![T(Token::Else), N(Block)],
+            |mut l| {
+                let list = l.pop().unwrap().astnode().stmt_list();
+                AstNode::Else(Some(list))
+            }
+        ),
+        rule(
+            NonTerminal::Else,
+            vec![T(Token::Else), N(NonTerminal::If)],
+            |mut l| {
+                let ifstmt = l.pop().unwrap().astnode().stmt();
+                AstNode::Else(Some(vec![ifstmt]))
+       
             }
         ),
 
