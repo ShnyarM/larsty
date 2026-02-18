@@ -1,3 +1,4 @@
 i32 myfunction() {
   let x = 5;
+  return;
 }

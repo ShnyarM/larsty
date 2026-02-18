@@ -8,6 +8,7 @@ pub enum Token {
     Function,       // function
     Let,            // let
     If,             // if
+    Return,         // return
 
     LParen,         // (
     RParen,         // )
@@ -38,6 +39,7 @@ impl Token {
             Token::Function => 0,
             Token::Let => 1,
             Token::If => 2,
+            Token::Return => 3,
 
             Token::LParen => 500,
             Token::RParen => 501,

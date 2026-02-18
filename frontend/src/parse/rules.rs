@@ -133,7 +133,6 @@ where
 
 // Make changes to grammar here
 pub fn get_rules() -> Grammar {
-    use Expression::*;
     use Symbol::*;
     use NonTerminal::*;
     use Token::*;
@@ -193,7 +192,7 @@ pub fn get_rules() -> Grammar {
         // ------------- FUNCTION ----------------
         rule(
             NonTerminal::Function,
-            vec![N(RetType), T(Token::Id(String::from(""))), T(LParen), T(RParen), T(LBrack), N(StmtList), T(RBrack)],
+            vec![N(RetType), T(Id(String::from(""))), T(LParen), T(RParen), T(LBrack), N(StmtList), T(RBrack)],
             |mut l| {
                 l.pop(); // }
                 let list = l.pop().unwrap().astnode().stmt_list(); // statements
@@ -214,7 +213,7 @@ pub fn get_rules() -> Grammar {
         // ------------- STATEMENT LIST ----------------
         rule(
             NonTerminal::StmtList,
-            vec![N(NonTerminal::StmtList), N(NonTerminal::Stmt)],
+            vec![N(StmtList), N(Stmt)],
             |mut l| {
                 let stmt = l.pop().unwrap().astnode().stmt();
                 let mut list = l.pop().unwrap().astnode().stmt_list();
@@ -232,7 +231,7 @@ pub fn get_rules() -> Grammar {
         // ------------- STATEMENT ----------------
         rule(   // --- DECLARATION ---
             NonTerminal::Stmt,
-            vec![T(Token::Let), T(Token::Id(String::from(""))), T(Token::Eq), N(NonTerminal::Expr), T(Token::SemiColon)],
+            vec![T(Let), T(Id(String::from(""))), T(Eq), N(Expr), T(SemiColon)],
             |mut l| {
                 l.pop(); // ;
                 let expr = l.pop().unwrap().astnode().expr();
@@ -240,6 +239,46 @@ pub fn get_rules() -> Grammar {
                 let name = l.pop().unwrap().token().into_get().str();
                 let loc = l.pop().unwrap().token().into_loc();
                 AstNode::S(Node::new(Statement::Decl(name, expr), loc))
+            }
+        ),
+        rule(   // --- ASSIGNMENT ---
+            NonTerminal::Stmt,
+            vec![T(Id(String::from(""))), T(Eq), N(Expr), T(SemiColon)],
+            |mut l| {
+                l.pop(); // ;
+                let expr = l.pop().unwrap().astnode().expr();
+                l.pop(); // ;
+                let (name, loc) = l.pop().unwrap().token().extract();
+                AstNode::S(Node::new(Statement::Assn(name.str(), expr), loc))
+            }
+        ),
+        rule(   // --- BLOCK ---
+            NonTerminal::Stmt,
+            vec![T(LBrack), N(StmtList), T(RBrack)],
+            |mut l| {
+                l.pop(); // }
+                let list = l.pop().unwrap().astnode().stmt_list();
+                let loc = l.pop().unwrap().token().into_loc();
+                AstNode::S(Node::new(Statement::Block(list), loc))
+            }
+        ),
+        rule(   // --- RETURN ---
+            NonTerminal::Stmt,
+            vec![T(Return), N(Expr), T(SemiColon)],
+            |mut l| {
+                l.pop(); // ;
+                let expr = l.pop().unwrap().astnode().expr();
+                let loc = l.pop().unwrap().token().into_loc();
+                AstNode::S(Node::new(Statement::Ret(Some(expr)), loc))
+            }
+        ),
+        rule(   // --- RETURN VOID ---
+            NonTerminal::Stmt,
+            vec![T(Return), T(SemiColon)],
+            |mut l| {
+                l.pop(); // ;
+                let loc = l.pop().unwrap().token().into_loc();
+                AstNode::S(Node::new(Statement::Ret(None), loc))
             }
         ),
 
