@@ -5,7 +5,7 @@ which can then be used at runtime. Supports operator precedence and associativit
 reduce conflicts.
 
 Currently, the grammar defined in the code is a programming-language-like grammar. The generator is able to create a parser that
-can successfully create a usable AST from the following snippet of code:
+can successfully create a usable AST from the following snippet of code (see [file.txt](input/file.txt)):
 
 ```
 i32 myfunction() {
@@ -59,6 +59,10 @@ Additionally, tokens can have precedence and associativity rules associated with
 When compiling the program, both the lexer and parser get generated, and their structure get included into the final binary executable of the `core` program.
 The `core` program takes in an input file, and prints the AST of the parsed input. Since the parser and lexer get created at compile,
 the parser and lexer do not have to be derived again, but rather only extracted and executed.
+
+## Execution
+
+Execution takes in one command line argument, that being the path to the file that should be parsed.
 
 ## TO DOs
 
