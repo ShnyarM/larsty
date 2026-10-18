@@ -9,3 +9,7 @@ i32 myfunction() {
   }
   return 7;
 }
+
+void myotherfunc(){
+  let foo = 7;
+}

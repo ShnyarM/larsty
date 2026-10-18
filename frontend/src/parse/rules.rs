@@ -4,11 +4,11 @@ use crate::ast;
 use crate::ast::*;
 
 // HOW TO ADD RULES 
-// Rules have to be added in the get_rules() function.
-// Each possible NonTerminal has to be added to the NonTerminal enum. Make sure to adjust
+// - Rules have to be added in the get_rules() function.
+// - Each possible NonTerminal has to be added to the NonTerminal enum. Make sure to adjust
 // NON_TERMINAL_COUNT accordingly.
 // 
-// Each rule needs a generator that specifies how to convert the Non_Terminal to an element that
+// - Each rule needs a generator that specifies how to convert the Non_Terminal to an element that
 // is part of Ast. Output has to be an AstNode, so if generator returns a type that can't be
 // represented by an AstNode yet, then add that type to AstNode enum.
 
