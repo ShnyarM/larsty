@@ -68,4 +68,4 @@ Execution takes in one command line argument, that being the path to the file th
 
 - Create a cleaner interface or defining the lexer and grammar rules
 - Make the implementation more generic, and less reliant on pre-defined types
-- (If possible) Create a generic package, that can be used for other programs
+- (If possible) Create a generic package, that can be used in other programs
