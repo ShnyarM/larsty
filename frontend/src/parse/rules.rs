@@ -362,12 +362,30 @@ pub fn get_rules() -> Grammar {
         ),
 
         // ------------- EXPRESSION ----------------
-        rule(
+        rule( // ---- Integer ----
             NonTerminal::Expr,
             vec![T(Token::Int(0))],
             |mut l| {
                 let (v, loc) = l.pop().unwrap().token().extract();
                 AstNode::E(Node::new(Expression::Val(v.i32()), loc))
+            }
+        ),
+        rule( // ---- Addition ----
+            NonTerminal::Expr,
+            vec![N(NonTerminal::Expr), T(Token::Plus), N(NonTerminal::Expr)],
+            |mut l| {
+                let e2 = l.pop().unwrap().astnode().expr();
+                l.pop(); // +
+                let e1 = l.pop().unwrap().astnode().expr();
+                let loc = e1.loc().clone();
+                AstNode::E(
+                    Node::new(
+                        Expression::Bop(
+                            Bop::Add, 
+                            Box::new(e1), 
+                            Box::new(e2)), 
+                        loc)
+                )
             }
         ),
 

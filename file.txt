@@ -1,7 +1,7 @@
 i32 myfunction() {
   let x = 5;
   if(6){
-    let y = 6;
+    let y = 6 + 8;
   }else if(7){
     z=6;
   }else {

@@ -623,7 +623,6 @@ impl ParserDFA {
         while index < input.len() {
             let node = &input[index];
             let token = node.get();
-            println!("{:?}", token);
             let action = self.action_table[current_state][token.index()];
             match action {
                 Action::None => return Err(
@@ -640,7 +639,6 @@ impl ParserDFA {
                     index += 1;
                 },
                 Action::Reduce(index) => {
-                    println!("Reduce, index {index}");
                     let rule = &grammar.rules[index];
                     let non_terminal = rule.lhs;
 
@@ -674,7 +672,6 @@ impl ParserDFA {
         
         // If all went well we should have only final NonTerminal with EOF at end
         if processed.len() != 2 {
-            println!("Count: {}, {:?}", processed.len(), processed);
             return Err(String::from(
                 "Parse error, more than one processed Symbol at the end. Perhaps the start rule at the beginning of the grammar rules is missing."
             ));

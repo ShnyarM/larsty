@@ -341,6 +341,8 @@ impl DFA{
                 i = last_accept_byte as usize;
                 last_accept_action = -1;
                 last_accept_byte = 0;
+                line = last_accept_line;
+                line_char = last_accept_line_char;
                 continue;
             }
 
