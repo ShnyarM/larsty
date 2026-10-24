@@ -440,8 +440,7 @@ impl NFA{
 
     /// Merges two NFAs by adding all states of other to this NFA
     /// 
-    /// New accept state depends on accept argument. If 0, the accept state of self is taken. If 1,
-    /// the accept state of other is taken
+    /// Accept states of the other NFA are also copied
     ///
     /// new_transitions is a list of transitions to be added during this merge, allowing for
     /// connections between self and other to be made.
