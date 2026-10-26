@@ -1,0 +1,9 @@
+[package]
+name = "larsty_gen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Build-time generator for larsty"
+
+[dependencies]
+larsty_rt = { workspace = true }

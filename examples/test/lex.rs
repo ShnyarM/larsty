@@ -1,15 +1,3 @@
-mod rules;
-mod automaton;
-mod lexer;
-mod regexp;
-
-pub use lexer::Lexer;
-pub use rules::get_rules;
-
-pub fn pre_compile_lexer() {
-    Lexer::pre_compile(rules::get_rules());
-}
-
 #[cfg(test)]
 mod test{
     use super::regexp::Regexp;

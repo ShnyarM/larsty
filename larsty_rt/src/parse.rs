@@ -1,5 +1,5 @@
 mod rules;
-mod types;
+pub mod types;
 mod automaton;
 mod parser;
 

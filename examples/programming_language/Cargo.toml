@@ -1,0 +1,11 @@
+[package]
+name = "programming_language"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+larsty = { workspace = true }
+
+[build-dependencies]
+larsty = { workspace = true, features = ["gen"] }

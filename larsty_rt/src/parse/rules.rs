@@ -162,7 +162,7 @@ pub fn get_rules() -> Grammar {
         (Mult, Left)
     ];
 
-    // Define precedence of different operators. Operators with a hihger value
+    // Define precedence of different operators. Operators with a higher value
     // have higher precedence
     let precedence = vec![
         (Mult, 100),

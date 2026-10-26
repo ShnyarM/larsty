@@ -1,0 +1,13 @@
+[package]
+name = "larsty"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "LALR(1) lexer and parser generator"
+
+[features]
+gen = ["dep:larsty_gen"]
+
+[dependencies]
+larsty_rt  = { workspace = true }
+larsty_gen = { workspace = true, optional = true }

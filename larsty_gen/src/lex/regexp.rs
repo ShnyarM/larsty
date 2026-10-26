@@ -1,5 +1,3 @@
-use super::automaton::{NFA, DFA, EPSILON_CHAR, NOT_ACCEPT};
-
 pub enum Regexp{
     Empty,
     String(String),
