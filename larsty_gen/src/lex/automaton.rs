@@ -51,19 +51,19 @@ impl GenDFA{
         dfa
     }
 
-    pub fn compress(&self) -> CompressedDFA {
-        let transitions = self.get_sparse_transitions();
+    // pub fn compress(&self) -> CompressedDFA {
+    //     let transitions = self.get_sparse_transitions();
 
-        // Copy actions
-        let mut actions = HashMap::new();
-        for (s, a) in self.actions.iter().enumerate() {
-            if *a != NOT_ACCEPT {
-                actions.insert(s, *a);
-            }
-        }
+    //     // Copy actions
+    //     let mut actions = HashMap::new();
+    //     for (s, a) in self.actions.iter().enumerate() {
+    //         if *a != NOT_ACCEPT {
+    //             actions.insert(s, *a);
+    //         }
+    //     }
 
-        CompressedDFA { state_count: self.state_count, transitions, actions }
-    }
+    //     CompressedDFA { state_count: self.state_count, transitions, actions }
+    // }
     
     // Makes sure that the vector of transitions matches the length of all states
     fn adjust_vec(&mut self) {
@@ -402,13 +402,13 @@ impl NFA{
         result
     }
 
-    pub fn to_dfa(&self) -> DFA {
+    pub fn to_dfa(&self) -> GenDFA {
         // Map each new state in DFA to a set of states
         let mut new_states: Vec<Vec<usize>> = Vec::new();
 
         // Keep track of all set of states we have inserted with their state in DFA
         let mut seen_sets: HashMap<Vec<usize>, usize> = HashMap::new();
-        let mut dfa = DFA::new();
+        let mut dfa = GenDFA::new();
 
         let start_closure = self.epsilon_closure(&vec![self.get_start_state()]);
         seen_sets.insert(start_closure.clone(), dfa.get_start_state());

@@ -12,6 +12,8 @@
 
 use larsty_rt::Associativity;
 
+pub type LexerRule = Regexp;
+
 pub struct ParserRule {
     pub lhs: String,
     pub rhs: Vec<String>,

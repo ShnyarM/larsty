@@ -1,4 +1,4 @@
-mod lex;
+pub mod lex;
 mod types;
 pub mod spec;
 
